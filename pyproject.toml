@@ -1,0 +1,66 @@
+[tool.poetry]
+name = "llm-moral-sycophancy"
+version = "0.1.0"
+description = "Behavioral study of LLM moral sycophancy with CLI benchmarking and scoring"
+authors = ["Lukas Strickler <lukasstrickler@users.noreply.github.com>"]
+readme = "README.md"
+packages = [
+  { include = "src", from = "." }
+]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+python-dotenv = "^1.0.1"
+requests = "^2.32.4"
+httpx = "^0.27.2"
+typer = { version = "^0.12.5", optional = true }
+tqdm = { version = "^4.66.4", optional = true }
+rich = { version = "^13.7.1", optional = true }
+pandas = { version = "^2.2.2", optional = true }
+
+[tool.poetry.extras]
+cli = ["typer", "tqdm", "rich", "pandas"]
+
+[tool.poetry.group.ml.dependencies]
+torch = "^2.3.1"
+datasets = "^2.19.1"
+transformers = "^4.44.0"
+accelerate = "^0.33.0"
+evaluate = "^0.4.2"
+scikit-learn = "^1.5.1"
+numpy = "^1.26.4"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.5.7"
+black = "^24.8.0"
+pytest = "^8.2.0"
+mypy = "^1.11.1"
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "N",
+    "B",
+    "UP",
+    "RUF",
+]
+ignore = []
+fixable = ["ALL"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

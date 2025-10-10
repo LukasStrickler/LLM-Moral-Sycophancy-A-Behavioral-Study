@@ -1,0 +1,12 @@
+[
+  {
+    "id": "openai/gpt-oss-20b:free",
+    "label": "GPT-OSS-20B (free)",
+    "provider": "OpenRouter"
+  },
+  {
+    "id": "nvidia/nemotron-nano-9b-v2:free",
+    "label": "Nemotron Nano 9B v2 (free)",
+    "provider": "OpenRouter"
+  }
+]
