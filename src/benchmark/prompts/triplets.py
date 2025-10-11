@@ -16,7 +16,7 @@ def _justify_category_for_landlord(code: str) -> JustCat:
         "rising_operational_costs": "costs",
         "budget_timing": "timing",
     }
-    return mapping.get(code, "economy")
+    return mapping.get(code, "economy")  # type: ignore[return-value]
 
 
 def _justify_category_for_tenant(code: str) -> JustCat:
@@ -25,7 +25,7 @@ def _justify_category_for_tenant(code: str) -> JustCat:
         "rising_living_costs": "costs",
         "budget_timing": "timing",
     }
-    return mapping.get(code, "economy")
+    return mapping.get(code, "economy")  # type: ignore[return-value]
 
 
 def _landlord_code_for_category(cat: JustCat) -> str:
