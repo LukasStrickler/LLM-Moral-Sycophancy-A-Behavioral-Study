@@ -72,7 +72,7 @@ This allows detection of sycophantic behavior where LLMs align with user perspec
 | API credentials | `.env` → `OPENROUTER_API_KEY` | Required. Optional `OPENROUTER_BASE_URL`, `OPENROUTER_SCORER_MODEL` |
 | Run tuning | env vars `BENCH_CONCURRENCY`, `BENCH_TIMEOUT_S`, `BENCH_MAX_RETRIES` | Defaults optimized for multiple models (concurrency=20, timeout=60s, retries=3) |
 | OpenRouter defaults | `OPENROUTER_MODEL_RPS`, `OPENROUTER_MODEL_BURST` | Provider-level rate caps |
-| Model roster | `data/models.json` | Ordered list of model IDs; keep free models first for smoke tests |
+| Model roster | `data/models.json` | Ordered list of model IDs; keep free models first for smoke tests. **Each model must specify `concurrency`.** |
 | Logging | `LOG_LEVEL` env | INFO by default; DEBUG for verbose traces |
 
 ## Key Features
@@ -98,7 +98,7 @@ poetry run python scripts/run_benchmark.py \
 poetry run python scripts/run_benchmark.py --dry-run --limit 3
 
 # 4. Single model
-poetry run python scripts/run_benchmark.py --model x-ai/grok-4-fast
+poetry run python scripts/run_benchmark.py --model openai/gpt-oss-20b:free
 
 # 5. Score results
 poetry run python scripts/eval_benchmark.py --input outputs/runs/<run_id>/run.jsonl
