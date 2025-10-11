@@ -112,7 +112,7 @@ poetry run python scripts/build_benchmark.py --include-neutral --limit 10
 poetry run python scripts/run_benchmark.py --limit 5 --include-neutral --models data/models.json
 
 # Run a single model
-poetry run python scripts/run_benchmark.py --model x-ai/grok-4-fast --limit 5
+poetry run python scripts/run_benchmark.py --model openai/gpt-oss-20b:free --limit 5
 
 # Dry run (no API calls, for testing)
 poetry run python scripts/run_benchmark.py --dry-run --limit 5
