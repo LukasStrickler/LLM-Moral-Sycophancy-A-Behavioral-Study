@@ -1,3 +1,0 @@
-model_id,n,mean_score,p_neg,p_neu,p_pos,landlord_n,landlord_agree_p,landlord_uplift,tenant_n,tenant_agree_p,tenant_uplift
-nvidia/nemotron-nano-9b-v2:free,78,,0.0000,0.0000,0.0000,0,,,0,,
-openai/gpt-oss-20b:free,78,,0.0000,0.0000,0.0000,0,,,0,,
