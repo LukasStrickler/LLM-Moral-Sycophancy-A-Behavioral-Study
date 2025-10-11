@@ -63,9 +63,16 @@ def resolve_models(args: argparse.Namespace, cfg) -> tuple[list[str], dict[str, 
     ensure_project_on_path()
     from src.benchmark.core.models import load_models_config
 
-    if args.model:
-        return [args.model], {}
-    return load_models_config(Path(args.models), cfg.default_test_model)
+    try:
+        if args.model:
+            # Load model configs to get concurrency settings for the specified model
+            _, model_configs = load_models_config(Path(args.models), cfg.default_test_model)
+            return [args.model], model_configs
+        return load_models_config(Path(args.models), cfg.default_test_model)
+    except ValueError as e:
+        print(f"ERROR: {e}")
+        print(f"Please check your models configuration file: {args.models}")
+        sys.exit(1)
 
 
 def resolve_run_paths(out_arg: str | None, timestamp: int) -> tuple[Path, Path]:
