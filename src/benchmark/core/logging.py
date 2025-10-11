@@ -45,7 +45,7 @@ DISPLAY_NAME_OVERRIDES: dict[str, str] = {
 
 MODEL_PREFIX_WIDTH = 20
 TAG_PREFIX_WIDTH = 9
-PROGRESS_PREFIX_WIDTH = 9
+PROGRESS_PREFIX_WIDTH = 7
 
 
 def _format_opt(label: str, value: str | None, width: int) -> str:
@@ -167,7 +167,7 @@ class _StructuredFormatter(logging.Formatter):
             f"{time_part} | {progress}" f" | {model:<{MODEL_PREFIX_WIDTH}}" f" | {grid} | {task}"
         )
 
-        middle_part = f"{tag_text} {origin:<{LOGGER_COL_WIDTH}} {status_text}"
+        middle_part = f"{tag_text} | {origin:<{LOGGER_COL_WIDTH}} | {status_text}"
 
         if details_text:
             right_part = f"[{details_text}]"

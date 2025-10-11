@@ -147,7 +147,7 @@ async def _worker(
         factor = factors[task.index]
         prompt = build_chat_from_factors(factor)
         timestamp_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        _, completed = await progress.mark_start()
+        started, completed = await progress.mark_start()
         progress_str = _progress_str(completed, progress.total)
         logger.info(
             "",
@@ -224,7 +224,7 @@ async def _worker(
                 timestamp_iso=timestamp_iso,
                 model_id=task.model_id,
                 provider=provider_label,
-                prompt_id=prompt.prompt_id,
+                prompt_id=f"{task.index:03d}",  # Row number as prompt_id
                 perspective=factor.perspective,
                 factors=factor.to_payload(),
                 messages=prompt.messages,
@@ -254,7 +254,7 @@ async def _worker(
                 timestamp_iso=timestamp_iso,
                 model_id=task.model_id,
                 provider=provider_label or "unknown",
-                prompt_id=getattr(prompt, "prompt_id", None),
+                prompt_id=f"{task.index:03d}",  # Row number as prompt_id
                 perspective=getattr(factor, "perspective", None),
                 factors=factor.to_payload() if hasattr(factor, "to_payload") else None,
                 messages=getattr(prompt, "messages", None),
@@ -328,6 +328,7 @@ async def run_local_benchmark_async(
     include_neutral: bool = True,
     factors_list_override: Sequence[Factors] | None = None,
     assistant_models: list[str],
+    model_configs: dict[str, dict] | None = None,
     out_path: Path,
     dry_run: bool = False,
 ) -> Path:
@@ -337,7 +338,7 @@ async def run_local_benchmark_async(
     run_cfg = RunConfig.from_env()
     client: OpenRouterClient | None = None
     if not dry_run:
-        client = OpenRouterClient(cfg, run_cfg)
+        client = OpenRouterClient(cfg, run_cfg, model_configs)
     run_id = int(time.time())
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -361,7 +362,16 @@ async def run_local_benchmark_async(
     grid_path = out_path.with_name(out_path.stem + "_grid.json")
     grid_path.write_text(json.dumps(grid_snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    semaphore = asyncio.Semaphore(run_cfg.concurrency)
+    # Create per-model semaphores to prevent cross-model blocking
+    model_configs = model_configs or {}
+    model_semaphores: dict[str, asyncio.Semaphore] = {}
+    for model_id in assistant_models:
+        model_config = model_configs.get(model_id, {})
+        model_concurrency = model_config.get("concurrency")
+        if model_concurrency is None:
+            raise ValueError(f"Model {model_id} must specify 'concurrency' in models.json")
+        model_semaphores[model_id] = asyncio.Semaphore(model_concurrency)
+
     file_lock = asyncio.Lock()
     total_tasks = len(assistant_models) * len(selected)
     logger.info(
@@ -371,7 +381,7 @@ async def run_local_benchmark_async(
             "status_label": "schedule",
             "details": (
                 f"total={total_tasks} models={len(assistant_models)} prompts={len(selected)} "
-                f"concurrency={run_cfg.concurrency}"
+                f"per-model-concurrency"
             ),
         },
     )
@@ -382,7 +392,7 @@ async def run_local_benchmark_async(
         for idx in range(len(selected)):
             task = asyncio.create_task(
                 _worker(
-                    semaphore,
+                    model_semaphores[model_id],
                     client,
                     out_path,
                     file_lock,

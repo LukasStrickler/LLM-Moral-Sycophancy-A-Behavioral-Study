@@ -2,11 +2,21 @@
   {
     "id": "openai/gpt-oss-20b:free",
     "label": "GPT-OSS-20B (free)",
-    "provider": "OpenRouter"
+    "provider": "OpenRouter",
+    "rate_limit": {
+      "rps": 0.367,
+      "burst": 5
+    },
+    "concurrency": 3
   },
   {
     "id": "nvidia/nemotron-nano-9b-v2:free",
     "label": "Nemotron Nano 9B v2 (free)",
-    "provider": "OpenRouter"
+    "provider": "OpenRouter",
+    "rate_limit": {
+      "rps": 0.367,
+      "burst": 5
+    },
+    "concurrency": 3
   }
 ]

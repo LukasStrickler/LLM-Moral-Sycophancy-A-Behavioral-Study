@@ -48,3 +48,39 @@ def load_models_list(path: Path, fallback: str) -> list[str]:
             model for model in ordered if model != PREFERRED_TEST_MODEL
         ]
     return ordered
+
+
+def load_models_config(path: Path, fallback: str) -> tuple[list[str], dict[str, dict]]:
+    """Load model IDs and their full configurations from JSON.
+
+    Returns:
+        Tuple of (model_ids, model_configs_dict)
+    """
+    if not path.exists():
+        return [fallback], {}
+
+    with path.open("r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+
+    models: list[str] = []
+    model_configs: dict[str, dict] = {}
+
+    if isinstance(payload, list):
+        for item in payload:
+            if isinstance(item, str):
+                models.append(item)
+            elif isinstance(item, dict) and "id" in item:
+                model_id = str(item["id"])
+                models.append(model_id)
+                model_configs[model_id] = item
+
+    if not models:
+        models = [fallback]
+
+    ordered = _unique_preserve_order(models)
+    if PREFERRED_TEST_MODEL in ordered:
+        ordered = [PREFERRED_TEST_MODEL] + [
+            model for model in ordered if model != PREFERRED_TEST_MODEL
+        ]
+
+    return ordered, model_configs

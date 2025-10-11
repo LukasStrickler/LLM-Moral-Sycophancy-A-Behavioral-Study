@@ -28,9 +28,11 @@ LLM-Moral-Sycophancy-A-Behavioral-Study/
 │   │   │   ├── rate_limit.py  # Rate limiting utilities
 │   │   │   └── types.py       # Type definitions
 │   │   ├── prompts/           # Prompt generation
-│   │   │   ├── chat.py        # Chat message handling
-│   │   │   ├── generator.py  # Prompt generation logic
-│   │   │   └── schema.py     # Prompt schemas
+│   │   │   ├── chat.py        # One-sided, natural chat phrasing per perspective
+│   │   │   ├── relationship.py # Relationship compute (good/neutral/bad/one-sided)
+│   │   │   ├── triplets.py    # Matched landlord/tenant/neutral triplet generator
+│   │   │   ├── generator.py   # Facade returning flattened triplets
+│   │   │   └── schema.py      # Scenario dimensions (amounts, qualities)
 │   │   ├── providers/         # LLM provider integrations
 │   │   │   ├── base.py        # Base provider interface
 │   │   │   └── openrouter_client.py  # OpenRouter API client
@@ -101,7 +103,7 @@ LLM-Moral-Sycophancy-A-Behavioral-Study/
 # Build a small test grid
 poetry run python scripts/build_benchmark.py --include-neutral --limit 10
 
-# This creates outputs/raw/grid_preview.jsonl
+# This creates outputs/raw/grid.jsonl
 ```
 
 #### 2. Run Benchmark
@@ -156,24 +158,32 @@ OPENROUTER_API_KEY=your_api_key_here
 
 # Optional: Model selection
 OPENROUTER_MODEL=openai/gpt-oss-20b:free
-
-# Optional: Rate limiting (free-tier friendly defaults)
-BENCH_CONCURRENCY=8
-BENCH_RPS=0.33
-BENCH_BURST=3
-OPENROUTER_FREE_MODEL_RPS=0.33
-OPENROUTER_FREE_MODEL_BURST=5
 ```
 
 ### Rate Limiting
 
-The system includes built-in rate limiting optimized for multiple models:
+The system includes per-model rate limiting and concurrency control optimized for free-tier models:
 
-- **Concurrency**: Max 20 concurrent requests per run
-- **Rate**: ~20 requests/second per model
-- **Burst**: Allows short bursts of up to 20 requests
+- **OpenRouter free models**: 20 requests per minute limit
+- **Default rate**: 0.367 RPS (22 RPM) to maximize throughput
+- **Per-model concurrency**: Each model runs independently to prevent blocking
+- **Configuration**: Rate limits and concurrency configured per-model in `data/models.json`
 
-Adjust these values in `.env` based on your API quota.
+Example model configuration:
+```json
+{
+  "id": "openai/gpt-oss-20b:free",
+  "label": "GPT-OSS-20B (free)",
+  "provider": "OpenRouter",
+  "rate_limit": {
+    "rps": 0.367,
+    "burst": 5
+  },
+  "concurrency": 3
+}
+```
+
+Models without configuration use provider defaults (0.367 RPS, 5 burst). Each model must specify its own concurrency.
 
 ## 🖥️ HPC Cluster Usage (Slurm) - WIP
 
@@ -232,9 +242,10 @@ Scoring produces:
 The project investigates whether LLMs exhibit "moral sycophancy" - the tendency to align responses with user-stated moral positions rather than providing objective analysis.
 
 ### Prompt Design
-- **Scenario-based**: Real-world moral dilemmas (e.g., rent pricing)
-- **User perspective**: Explicitly stated moral position
-- **Neutral baseline**: Control prompts without moral framing
+- **Scenario-based**: Real-world dilemmas (e.g., rent pricing)
+- **One-sided perspectives**: Landlord and tenant prompts use indirect, natural chat phrasing (no explicit role declaration) to simulate native conversations.
+- **Neutral baseline**: Balanced, control prompts without moral framing.
+- **Matched triplets**: Each scenario yields 1 landlord + 1 tenant + 1 neutral prompt matched on amount, aligned justification category (economy | costs | timing), and a computed relationship label.
 
 ### Scoring System
 - **Master LLM**: Uses a separate LLM to score responses numerically

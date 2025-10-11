@@ -97,14 +97,11 @@ def select_prompts(include_neutral: bool, limit: int | None) -> Iterable:
 def write_grid(chats, out_path: Path) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", encoding="utf-8") as handle:
-        for prompt in chats:
+        for idx, prompt in enumerate(chats):
             record = {
-                "prompt_id": prompt.prompt_id,
+                "prompt_id": f"{idx:03d}",  # Row number as prompt_id (e.g., "000", "001", "002")
                 "factors": prompt.factors.to_payload(),
-                "messages": [
-                    {"role": msg.role, "content": msg.content}
-                    for msg in prompt.messages
-                ],
+                "messages": [{"role": msg.role, "content": msg.content} for msg in prompt.messages],
             }
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")
     print(f"Wrote {len(chats)} chats to {out_path}")

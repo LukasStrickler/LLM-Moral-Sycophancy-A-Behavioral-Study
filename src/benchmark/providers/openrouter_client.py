@@ -84,11 +84,20 @@ def _log_event(
 
 
 class OpenRouterClient:
-    def __init__(self, cfg: OpenRouterConfig, run_cfg: RunConfig | None = None):
+    # Provider-level defaults for OpenRouter free models
+    DEFAULT_RPS = 0.367  # 22 RPM, maximizes free tier limit of 20 RPM
+    DEFAULT_BURST = 5
+
+    def __init__(
+        self,
+        cfg: OpenRouterConfig,
+        run_cfg: RunConfig | None = None,
+        model_configs: dict[str, dict] | None = None,
+    ):
         self.cfg = cfg
         self.run_cfg = run_cfg or RunConfig()
-        provider_name = "openrouter"
-        short = "OO"
+        self.model_configs = model_configs or {}
+        short = "OR"
         self.logger = setup_logger(short)
         self._client: httpx.AsyncClient | None = None
         self._limiters: dict[str, TokenBucket] = {}
@@ -105,9 +114,18 @@ class OpenRouterClient:
             self._client = None
 
     def _rate_burst_for_model(self, model_id: str) -> tuple[float, int]:
-        rate = self.cfg.model_rps
-        burst = self.cfg.model_burst
-        
+        # Check for per-model configuration first
+        model_config = self.model_configs.get(model_id, {})
+        rate_limit = model_config.get("rate_limit", {})
+
+        if rate_limit:
+            rate = rate_limit.get("rps", self.DEFAULT_RPS)
+            burst = rate_limit.get("burst", self.DEFAULT_BURST)
+        else:
+            # Fall back to provider defaults
+            rate = self.DEFAULT_RPS
+            burst = self.DEFAULT_BURST
+
         rate = max(rate, 0.05)  # ensure progress even if values are tiny
         burst = max(burst, 1)
         return rate, burst

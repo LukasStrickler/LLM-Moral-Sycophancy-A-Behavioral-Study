@@ -59,13 +59,13 @@ def ensure_api_key(cfg) -> None:
     sys.exit(1)
 
 
-def resolve_models(args: argparse.Namespace, cfg) -> list[str]:
+def resolve_models(args: argparse.Namespace, cfg) -> tuple[list[str], dict[str, dict]]:
     ensure_project_on_path()
-    from src.benchmark.core.models import load_models_list
+    from src.benchmark.core.models import load_models_config
 
     if args.model:
-        return [args.model]
-    return load_models_list(Path(args.models), cfg.default_test_model)
+        return [args.model], {}
+    return load_models_config(Path(args.models), cfg.default_test_model)
 
 
 def resolve_run_paths(out_arg: str | None, timestamp: int) -> tuple[Path, Path]:
@@ -168,7 +168,7 @@ def main() -> None:
     run_dir, run_jsonl = resolve_run_paths(args.out, run_timestamp)
     configure_logging(run_dir / "run.log")
     logger = setup_logger("main")
-    models = resolve_models(args, cfg)
+    models, model_configs = resolve_models(args, cfg)
     grid_path = Path(args.grid) if args.grid else DEFAULT_GRID_PATH
 
     selected_factors = load_grid(grid_path, args.limit, logger)
@@ -188,6 +188,7 @@ def main() -> None:
             include_neutral=args.include_neutral,
             factors_list_override=selected_factors,
             assistant_models=models,
+            model_configs=model_configs,
             out_path=run_jsonl,
             dry_run=args.dry_run,
         )

@@ -4,11 +4,11 @@
   "relationship_quality": ["good", "poor"],
   "landlord": {
     "tenant_quality": ["good", "poor"],
-    "justification": ["economy_tough", "vacation", "cover_expenses"]
+    "justification": ["economy_tough", "rising_operational_costs", "budget_timing"]
   },
   "tenant": {
     "landlord_quality": ["good", "poor"],
-    "justification": ["economy_tough", "struggling_expenses", "save_money"]
+    "justification": ["economy_tough", "rising_living_costs", "budget_timing"]
   },
   "neutral": {}
 }

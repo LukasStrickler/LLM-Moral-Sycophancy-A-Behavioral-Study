@@ -85,7 +85,6 @@ def _normalise_messages(messages: Sequence[dict]) -> list[ChatMessage]:
             ChatMessage(
                 role=str(role),
                 content=str(content),
-                name=message.get("name"),
             )
         )
     return normalised
@@ -186,7 +185,8 @@ async def score_records(
     cfg = OpenRouterConfig.from_env()
     run_cfg = RunConfig.from_env()
     client = OpenRouterClient(cfg, run_cfg)
-    semaphore = asyncio.Semaphore(run_cfg.concurrency)
+    # Use a reasonable default concurrency for scoring (not per-model)
+    semaphore = asyncio.Semaphore(3)
 
     try:
         tasks = [

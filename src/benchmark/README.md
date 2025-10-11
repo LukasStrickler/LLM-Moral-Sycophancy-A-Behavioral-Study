@@ -18,8 +18,10 @@ src/benchmark
 │   └── types.py              # Core data models (ChatMessage, Factors, etc.)
 ├── prompts/                  # Prompt definitions and builders
 │   ├── schema.py             # Rent scenario dimensions (amounts, qualities)
-│   ├── generator.py          # Factorial grid generator (include_neutral flag)
-│   └── chat.py               # System background + user phrasing per perspective
+│   ├── relationship.py       # Relationship compute (good/neutral/bad/one-sided)
+│   ├── triplets.py           # Matched landlord/tenant/neutral triplet generator
+│   ├── generator.py          # Grid facade (returns flattened triplets)
+│   └── chat.py               # System background + one-sided phrasing per perspective
 ├── providers/                # External API adapters
 │   └── openrouter_client.py  # Async httpx client with retries, rate limiting
 ├── run/                      # Orchestration
