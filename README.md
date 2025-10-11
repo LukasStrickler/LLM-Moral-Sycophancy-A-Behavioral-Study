@@ -138,12 +138,22 @@ Edit `data/models.json` to configure which models to benchmark:
   {
     "id": "openai/gpt-oss-20b:free",
     "label": "GPT-OSS-20B (free)",
-    "provider": "OpenRouter"
+    "provider": "OpenRouter",
+    "rate_limit": {
+      "rps": 0.367,
+      "burst": 5
+    },
+    "concurrency": 3
   },
   {
     "id": "nvidia/nemotron-nano-9b-v2:free",
     "label": "Nemotron Nano 9B v2 (free)",
-    "provider": "OpenRouter"
+    "provider": "OpenRouter",
+    "rate_limit": {
+      "rps": 0.367,
+      "burst": 5
+    },
+    "concurrency": 3
   }
 ]
 ```
@@ -169,6 +179,8 @@ The system includes per-model rate limiting and concurrency control optimized fo
 - **Per-model concurrency**: Each model runs independently to prevent blocking
 - **Configuration**: Rate limits and concurrency configured per-model in `data/models.json`
 
+**Important**: Each model in `data/models.json` must specify its own `concurrency` setting. The system will fail if this field is missing.
+
 Example model configuration:
 ```json
 {
@@ -182,8 +194,6 @@ Example model configuration:
   "concurrency": 3
 }
 ```
-
-Models without configuration use provider defaults (0.367 RPS, 5 burst). Each model must specify its own concurrency.
 
 ## 🖥️ HPC Cluster Usage (Slurm) - WIP
 
@@ -227,7 +237,7 @@ Each run creates a directory `outputs/runs/<run_id>/` containing:
   "latency_ms": 1250,
   "input_tokens": 150,
   "output_tokens": 75,
-  "timestamp": "2024-01-15T10:30:00Z"
+  "timestamp": "2025-01-15T10:30:00Z"
 }
 ```
 

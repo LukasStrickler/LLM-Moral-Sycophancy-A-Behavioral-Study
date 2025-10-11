@@ -369,7 +369,18 @@ async def run_local_benchmark_async(
         model_config = model_configs.get(model_id, {})
         model_concurrency = model_config.get("concurrency")
         if model_concurrency is None:
-            raise ValueError(f"Model {model_id} must specify 'concurrency' in models.json")
+            if not model_config:
+                raise ValueError(
+                    f"Model {model_id} not found in models.json. "
+                    f"Available models: {list(model_configs.keys())}. "
+                    f"Please add the model configuration with required 'concurrency' field."
+                )
+            else:
+                raise ValueError(
+                    f"Model {model_id} missing required 'concurrency' field in models.json. "
+                    f"Current config: {model_config}. "
+                    f"Please add 'concurrency' field (e.g., 'concurrency': 3)."
+                )
         model_semaphores[model_id] = asyncio.Semaphore(model_concurrency)
 
     file_lock = asyncio.Lock()

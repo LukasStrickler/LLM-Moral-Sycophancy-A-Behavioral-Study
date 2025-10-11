@@ -59,8 +59,13 @@ def load_models_config(path: Path, fallback: str) -> tuple[list[str], dict[str, 
     if not path.exists():
         return [fallback], {}
 
-    with path.open("r", encoding="utf-8") as handle:
-        payload = json.load(handle)
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in {path}: {e}") from e
+    except Exception as e:
+        raise ValueError(f"Error reading {path}: {e}") from e
 
     models: list[str] = []
     model_configs: dict[str, dict] = {}
