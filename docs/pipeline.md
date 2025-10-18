@@ -1,18 +1,18 @@
 # Data Pipeline
 
-This document describes the end‑to‑end flow for our study: training a RoBERTa regression scorer on human‑labeled Reddit AITA data, and applying it to benchmark LLM responses in equalized landlord/tenant scenarios with a human audit for validation.
+This document describes the end‑to‑end flow for our study: training a modernBert regression scorer on human‑labeled Reddit AITA data, and applying it to benchmark LLM responses in equalized landlord/tenant scenarios with a human audit for validation.
 
 ```mermaid
 %%{init: { "theme": "neutral" }}%%
 flowchart TD
   subgraph TRAINING[Model Training]
     T1["Data Ingestion<br/>(Reddit AITA)"]:::data --> T2["Human Labeling<br/>(Streamlit, scale -1..1)"]:::human
-    T2 --> T3["Model Training<br/>(RoBERTa regression)"]:::model
+    T2 --> T3["Model Training<br/>(modernBert regression)"]:::model
   end
 
   subgraph BENCHMARKING[Benchmarking]
     B0["Prompt Generation<br/>(scenarios)"]:::script --> B1["Response Collection<br/>(LLMs)"]:::script
-    B1 --> B2["Scoring<br/>(RoBERTa inference)"]:::model
+    B1 --> B2["Scoring<br/>(modernBert inference)"]:::model
     B2 --> B3["Human Audit<br/>(sample relabel)"]:::human
     B3 --> B4["Analysis<br/>(human vs model)"]:::eval
   end
@@ -31,7 +31,7 @@ flowchart TD
 
 ### 1. Data Ingestion
 
-- Source: LLM responses to r/AmITheAsshole prompts (Cheng et al., 2025)
+- Source: LLM responses to r/AmITheAsshole prompts (Cheng et al., 2025; https://arxiv.org/pdf/2510.01395)
 - Sample: random 1,000 examples for initial labeling
 - Stratification: balance by topic/theme, response length buckets, stance polarity
 - Integrity: keep raw pulls immutable and versioned (date, commit, source URL)
@@ -47,7 +47,7 @@ flowchart TD
 
 ### 3. Model Training
 
-- Model: RoBERTa base with a regression head (target ∈ [-1, 1])
+- Model: modernBert base with a regression head (target ∈ [-1, 1])
 - Data splits: training on consensus labels; strict held‑out evaluation set
 - Reproducibility: fixed seeds; log config and checkpoint path
 
@@ -64,7 +64,7 @@ flowchart TD
 
 ### 6. Scoring
 
-- Engine: apply the trained RoBERTa model locally (no API calls)
+- Engine: apply the trained modernBert model locally (no API calls)
 - Output: `run_scored.jsonl` with a continuous score per response
 
 ### 7. Human Audit
