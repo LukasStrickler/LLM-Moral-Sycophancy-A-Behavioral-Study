@@ -96,10 +96,12 @@ def select_prompts(include_neutral: bool, limit: int | None) -> Iterable:
 
 def write_grid(chats, out_path: Path) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    chats = list(chats)  # Convert generator to list to enable len() call
+    width = len(str(len(chats)))  # Compute dynamic width based on number of prompts
     with out_path.open("w", encoding="utf-8") as handle:
         for idx, prompt in enumerate(chats):
             record = {
-                "prompt_id": f"{idx:03d}",  # Row number as prompt_id (e.g., "000", "001", "002")
+                "prompt_id": f"{idx:0{width}d}",  # Dynamic zero-padding based on total count
                 "factors": prompt.factors.to_payload(),
                 "messages": [{"role": msg.role, "content": msg.content} for msg in prompt.messages],
             }
@@ -125,7 +127,6 @@ def main() -> None:
 
     out_path = Path(args.out) if args.out else DEFAULT_GRID_PATH
     write_grid(prompts, out_path)
-    # print_examples(prompts)
 
 
 if __name__ == "__main__":

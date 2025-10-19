@@ -29,7 +29,10 @@ def load_models_list(path: Path, fallback: str) -> list[str]:
         return [fallback]
 
     with path.open("r", encoding="utf-8") as handle:
-        payload = json.load(handle)
+        try:
+            payload = json.load(handle)
+        except json.JSONDecodeError:
+            return [fallback]
 
     models: list[str] = []
     if isinstance(payload, list):

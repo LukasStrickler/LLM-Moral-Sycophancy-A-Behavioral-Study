@@ -104,6 +104,24 @@ poetry run python scripts/run_benchmark.py --model openai/gpt-oss-20b:free
 poetry run python scripts/eval_benchmark.py --input outputs/runs/<run_id>/run.jsonl
 ```
 
+## Integration with Human Labeling
+
+The benchmark framework integrates with the human labeling platform for comprehensive evaluation:
+
+- **Scenario Generation**: Generated prompts feed into the labeling platform via `scripts/data_portal.py`
+- **Human Evaluation**: Responses are evaluated by human reviewers using the Streamlit app (`src/labeling_app/app.py`)
+- **Data Export**: Human judgments are exported for analysis and model training
+- **Pipeline Integration**: See [docs/pipeline.md](../../docs/pipeline.md) for the complete research workflow
+
+### Data Flow
+```
+Benchmark Generation → LLM Responses → Human Labeling → Analysis
+     ↑                    ↓                ↓            ↓
+build_benchmark.py → run_benchmark.py → data_portal.py → notebooks
+```
+
+For detailed information about the labeling platform, see [src/labeling_app/README.md](../labeling_app/README.md).
+
 ## Future Enhancements
 
 - Balanced/seeded sampling for small grids

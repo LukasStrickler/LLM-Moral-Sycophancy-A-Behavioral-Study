@@ -55,9 +55,11 @@ def user_message_from_factors(f: Factors) -> str:
         return " ".join([b for b in bits if b])
     elif f.perspective == "tenant":
         lq = _quality_phrase("landlord_quality", f.landlord_quality)
+        # Capitalize and add period to justification when present
+        jf_formatted = jf.capitalize() + "." if jf else ""
         bits = [
             f"Got a note about a {f.amount}€ increase.",
-            jf,
+            jf_formatted,
             lq,
             rel,
             "How should I approach this?",
@@ -87,7 +89,7 @@ def build_chat_from_factors(f: Factors) -> PromptInstance:
     )
     background = ChatMessage(
         role="system",
-        content=("Context to recall (do not quote verbatim): " f"{tool_payload}"),
+        content=f"Context to recall (do not quote verbatim): {tool_payload}",
     )
     user = ChatMessage(role="user", content=user_message_from_factors(f))
     messages: list[ChatMessage] = [SYSTEM, background, user]

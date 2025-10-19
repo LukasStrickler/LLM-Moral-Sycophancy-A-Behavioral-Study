@@ -1,5 +1,7 @@
 # LLM Moral Sycophancy: A Behavioral Study
 
+> **Academic Research Project** | University of Mannheim | IS 617 Course
+
 A comprehensive research project investigating Large Language Model (LLM) moral sycophancy behavior. This project analyzes how LLMs align with user perspectives on moral issues (e.g., rent pricing) to quantify bias when used for advice-giving applications.
 
 **Course**: IS 617 (Large Language Models for the Economic and Social Sciences) - University of Mannheim
@@ -15,8 +17,16 @@ LLM-Moral-Sycophancy-A-Behavioral-Study/
 │
 ├── data/                        # Configuration and prompt data
 │   ├── models.json             # Model configurations for benchmarking
+│   ├── humanLabel/             # Human labeling data assets
+│   │   ├── [README.md](data/humanLabel/README.md)           # Human labeling documentation
+│   │   ├── seeds/              # Canonical datasets for database seeding
+│   │   │   ├── aita_seed.jsonl # Reddit AITA prompts
+│   │   │   └── scenario_seed.jsonl # Generated scenario prompts
+│   │   └── reviews/            # Raw human review submissions
+│   │       ├── aita_reviews.jsonl
+│   │       └── scenario_reviews.jsonl
 │   └── prompts/               # Prompt templates and scenarios
-│       ├── README.md
+│       ├── [README.md](data/prompts/README.md)
 │       └── rent_scenario.json
 │
 ├── src/                         # Source code
@@ -43,17 +53,33 @@ LLM-Moral-Sycophancy-A-Behavioral-Study/
 │   │   ├── scoring/            # Response scoring
 │   │   │   ├── master.py      # Master LLM scorer
 │   │   │   └── metrics.py    # Scoring metrics
-│   │   └── README.md
+│   │   └── [README.md](src/benchmark/README.md)
+│   ├── labeling_app/           # Human labeling platform
+│   │   ├── app.py             # Streamlit UI with cookie-based persistence
+│   │   ├── settings.py        # Configuration management
+│   │   ├── core/              # Core platform logic
+│   │   │   ├── assignment.py  # Review assignment and prioritization
+│   │   │   └── models.py     # Database models (LLMResponse, Review)
+│   │   ├── db/                # Database layer
+│   │   │   ├── libsql.py      # Turso/libSQL client implementation
+│   │   │   └── queries.py     # Database queries
+│   │   ├── workflows/         # Data workflows
+│   │   │   ├── admin.py       # Administrative operations
+│   │   │   ├── exporting.py   # Review export utilities
+│   │   │   └── seeding.py     # Data seeding workflows
+│   │   └── [README.md](src/labeling_app/README.md)
 │   └── scoring/                # ML scoring models (future)
-│       └── README.md
+│       └── [README.md](src/scoring/README.md)
 │
 ├── scripts/                     # Command-line tools
 │   ├── build_benchmark.py      # Build benchmark grid
 │   ├── run_benchmark.py        # Execute benchmark runs
-│   └── eval_benchmark.py       # Score benchmark results
+│   ├── eval_benchmark.py       # Score benchmark results
+│   ├── data_portal.py          # Manage labeling platform data
+│   └── [README.md](scripts/README.md)
 │
 ├── slurm/                       # HPC cluster job scripts
-│   ├── README.md               # Slurm usage guide
+│   ├── [README.md](slurm/README.md)               # Slurm usage guide
 │   ├── job_benchmark.sbatch    # Benchmark job script
 │   └── job_train_roberta.sbatch # Training job script
 │
@@ -65,6 +91,27 @@ LLM-Moral-Sycophancy-A-Behavioral-Study/
             ├── run_grid.json  # Prompt configuration
             └── run.log        # Execution logs
 ```
+## 📚 Documentation Navigation
+
+Quick access to all project documentation:
+
+### Core Documentation
+- **[Pipeline Guide](docs/pipeline.md)** - Complete research workflow and methodology
+- **[Scripts Documentation](scripts/README.md)** - Command-line tools and data portal CLI
+
+### Component Documentation
+- **[Benchmarking Framework](src/benchmark/README.md)** - Core benchmarking framework and LLM integration
+- **[Labeling Platform](src/labeling_app/README.md)** - Human labeling platform architecture and usage
+- **[Human Labeling Data](data/humanLabel/README.md)** - Data lifecycle and file formats
+- **[Prompt Templates](data/prompts/README.md)** - Prompt generation and scenario templates
+- **[HPC Cluster Usage](slurm/README.md)** - Slurm job scripts and cluster configuration
+- **[ML Scoring Models](src/scoring/README.md)** - Machine learning scoring models (future)
+
+### Quick Links
+- **[Environment Setup](.env.example)** - Configuration template
+- **[Model Configuration](data/models.json)** - LLM model settings
+- **[Project License](LICENSE)** - MIT License details
+
 ## 📈 Pipeline Overview
 
 We follow two flows: training a RoBERTa regression model on human‑labeled Reddit AITA data, then benchmarking our equalized scenario prompts, scoring responses with that model, and validating with a small human audit. Read more in the [Pipeline documentation](docs/pipeline.md).
@@ -198,6 +245,18 @@ OPENROUTER_API_KEY=your_api_key_here
 OPENROUTER_MODEL=openai/gpt-oss-20b:free
 ```
 
+### Labeling Platform Setup
+
+1. Copy `.env.example` to `.env` and set your Turso credentials.
+2. Install dependencies with `poetry install` (Streamlit, SQLAlchemy, CLI tooling included).
+3. Create the database schema via `poetry run python scripts/data_portal.py init-db`.
+4. Sync seed data (dry-run first, then apply) and export reviews with the same CLI.
+5. Launch the Streamlit app using `poetry run streamlit run src/labeling_app/app.py`.
+
+The data portal CLI reads/writes JSONL assets under `data/humanLabel/`. Pass `--run-file` to ingest
+fresh scenario responses from `outputs/runs/<run_id>/run.jsonl`. See [scripts/README.md](scripts/README.md)
+for advanced options and interactive mode.
+
 ### Rate Limiting
 
 The system includes per-model rate limiting and concurrency control optimized for free-tier models:
@@ -222,6 +281,57 @@ Example model configuration:
   "concurrency": 3
 }
 ```
+
+## 🏷️ Human Labeling Platform
+
+The project includes a comprehensive labeling platform for collecting human judgments on LLM responses. This system supports both Reddit AITA posts and generated scenario prompts.
+
+### Architecture
+
+The labeling platform (`src/labeling_app/`) consists of:
+
+- **Streamlit UI** (`app.py`): Cookie-based reviewer persistence, balanced assignment distribution
+- **Database Layer** (`db/`): Turso/libSQL backend with SQLAlchemy ORM
+- **Core Logic** (`core/`): Assignment prioritization and database models
+- **Workflows** (`workflows/`): Data seeding, exporting, and administrative operations
+
+### Database Schema
+
+- **LLMResponse**: Stores prompts and model responses for human evaluation
+- **Review**: Captures human judgments (score ∈ [-1, 1], notes, timestamps)
+
+### Assignment Logic
+
+The platform uses prioritized coverage to ensure balanced review collection:
+1. **2→3 reviews**: Items needing a third review (highest priority)
+2. **1→2 reviews**: Items moving from one to two reviews
+3. **0→1 reviews**: Brand-new items (lowest priority)
+
+Reviewers cannot see the same item twice until they've reviewed every item in the dataset at least once.
+After completing a full pass, prompts may resurface and each new submission is recorded as an
+additional review entry (INSERT operation)—prior scores remain unchanged for auditing.
+
+### Data Portal CLI
+
+Use `scripts/data_portal.py` to handle schema setup, seeding, exports, and dataset status checks. It
+supports both an interactive Rich menu (`poetry run python scripts/data_portal.py`) and
+non-interactive commands such as:
+
+```bash
+poetry run python scripts/data_portal.py init-db
+poetry run python scripts/data_portal.py push --dataset scenario --apply
+poetry run python scripts/data_portal.py pull --target reviews --dataset scenario
+poetry run python scripts/data_portal.py status --dataset aita
+```
+
+The CLI orchestrates the full labeling data flow:
+
+1. **Seeds** (`data/humanLabel/seeds/`) → database via `push`
+2. **Streamlit UI** (`src/labeling_app/app.py`) → reviewers submit labels
+3. **Exports** (`data/humanLabel/reviews/`) → notebooks and downstream analysis
+
+Additional details live in [src/labeling_app/README.md](src/labeling_app/README.md) and
+[scripts/README.md](scripts/README.md).
 
 ## 🖥️ HPC Cluster Usage (Slurm) - WIP
 

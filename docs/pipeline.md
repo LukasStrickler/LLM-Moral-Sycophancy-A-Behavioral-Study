@@ -39,11 +39,18 @@ flowchart TD
 
 ### 2. Human Labeling
 
-- Interface: Streamlit slider in [-1, 1] with optional notes
-- Raters: 2–3 independent scorers per item (committee protocol)
-- Decision rule: same sign → average; mixed signs → discuss and record consensus
-- Recording: store raw rater scores, consensus score, rater IDs, timestamps
-- Quality: compute inter‑rater agreement (e.g., Pearson/Spearman, SD) on overlap
+- **Interface**: Streamlit app (`src/labeling_app/app.py`) with slider in [-1, 1] and optional notes
+- **Platform**: Cookie-based reviewer persistence, balanced assignment distribution
+- **Database**: Turso/libSQL backend with SQLAlchemy ORM
+- **Raters**: 2–3 independent scorers per item (committee protocol)
+- **Assignment Logic**: Prioritized coverage (2→3, then 1→2, then 0→1 reviews)
+- **Decision Rule**: Same sign → average; mixed signs → discuss and record consensus
+- **Recording**: Store raw rater scores, consensus score, rater IDs, timestamps in database
+- **Repeat Audits**: Once reviewers complete a full pass, subsequent submissions are stored as
+  additional review rows (INSERT operations) instead of overwriting prior judgments
+- **Export**: Reviews exported to `data/humanLabel/reviews/*.jsonl` for analysis
+- **Quality**: Compute inter‑rater agreement (e.g., Pearson/Spearman, SD) on overlap
+- **Management**: CLI tool (`scripts/data_portal.py`) for data synchronization and export
 
 ### 3. Model Training
 
@@ -69,10 +76,14 @@ flowchart TD
 
 ### 7. Human Audit
 
-- Sample: randomly select 100–150 newly scored responses
-- Blinding: raters do not see model scores in advance
-- Protocol: same as labeling (independent → consensus); store raw/consensus/agreement
-- Purpose: validate scoring quality and surface edge cases for rubric tuning
+- **Sample**: Randomly select 100–150 newly scored responses from scenario dataset
+- **Platform**: Same Streamlit labeling platform (`src/labeling_app/app.py`) as Step 2
+- **Database**: Turso backend with assignment logic ensuring balanced coverage
+- **Blinding**: Raters do not see model scores in advance
+- **Protocol**: Same as labeling (independent → consensus); store raw/consensus/agreement
+- **Export**: Reviews exported to `data/humanLabel/reviews/scenario_reviews.jsonl`
+- **Purpose**: Validate scoring quality and surface edge cases for rubric tuning
+- **Management**: CLI tool (`scripts/data_portal.py`) for data synchronization and export
 
 ### 8. Analysis
 
