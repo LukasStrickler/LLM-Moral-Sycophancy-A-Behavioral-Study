@@ -65,6 +65,34 @@ LLM-Moral-Sycophancy-A-Behavioral-Study/
             ├── run_grid.json  # Prompt configuration
             └── run.log        # Execution logs
 ```
+## 📈 Pipeline Overview
+
+We follow two flows: training a RoBERTa regression model on human‑labeled Reddit AITA data, then benchmarking our equalized scenario prompts, scoring responses with that model, and validating with a small human audit. Read more in the [Pipeline documentation](docs/pipeline.md).
+
+```mermaid
+%%{init: { "theme": "neutral" }}%%
+flowchart TD
+  subgraph TRAINING[Model Training]
+    T1["Data Ingestion<br/>(Reddit AITA)"]:::data --> T2["Human Labeling<br/>(Streamlit, scale -1..1)"]:::human
+    T2 --> T3["Model Training<br/>(RoBERTa regression)"]:::model
+  end
+
+  subgraph BENCHMARKING[Benchmarking]
+    B0["Prompt Generation<br/>(scenarios)"]:::script --> B1["Response Collection<br/>(LLMs)"]:::script
+    B1 --> B2["Scoring<br/>(RoBERTa inference)"]:::model
+    B2 --> B3["Human Audit<br/>(sample relabel)"]:::human
+    B3 --> B4["Analysis<br/>(human vs model)"]:::eval
+  end
+
+  T3 -. provides model .-> B2
+
+  %% Classes
+  classDef data fill:#E3F2FD,stroke:#1E88E5,color:#0D47A1;
+  classDef script fill:#FFF8E1,stroke:#FB8C00,color:#E65100;
+  classDef model fill:#E8F5E9,stroke:#43A047,color:#1B5E20;
+  classDef human fill:#FFEBEE,stroke:#E53935,color:#B71C1C;
+  classDef eval fill:#F3E5F5,stroke:#8E24AA,color:#4A148C;
+```
 
 ## 🚀 Quick Start
 
