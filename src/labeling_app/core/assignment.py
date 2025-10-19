@@ -64,6 +64,7 @@ class AssignmentService:
             dataset,
             excluded_ids=excluded,
             reviewed_ids=set() if allow_repeats else reviewed_ids,
+            reviewer_code=reviewer_code,
         )
 
         if not candidate:

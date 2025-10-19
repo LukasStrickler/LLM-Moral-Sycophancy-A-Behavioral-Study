@@ -84,6 +84,7 @@ def next_response_candidate(
     dataset: Dataset,
     excluded_ids: set[int],
     reviewed_ids: set[int],
+    reviewer_code: str,
 ) -> dict | None:
     clauses: list[str] = ["responses.dataset = ?"]
     params: list[object] = [dataset.value]
@@ -101,7 +102,9 @@ def next_response_candidate(
         params.extend(reviewed_list)
 
     where_sql = " AND ".join(clauses)
-    query = f"""
+    
+    # First pass: prioritize items with <3 reviews (2→3, 1→2, 0→1)
+    query_primary = f"""
         SELECT
             responses.id,
             responses.dataset,
@@ -120,12 +123,55 @@ def next_response_candidate(
             FROM reviews
             GROUP BY llm_response_id
         ) AS review_counts ON review_counts.llm_response_id = responses.id
-        WHERE {where_sql}
+        WHERE {where_sql} AND COALESCE(review_counts.review_count, 0) < 3
         ORDER BY review_count DESC, responses.created_at ASC, responses.id ASC
         LIMIT 1
     """
 
-    result = client.execute(query, params)
+    result = client.execute(query_primary, params)
+    if result.rows:
+        return result.to_dicts()[0]
+    
+    # Fallback pass: if no items with <3 reviews available, allow items with ≥3 reviews
+    # Prioritize items with fewer reviews (3→4, 4→5) and deprioritize items reviewer has already seen
+    # Use combined aggregation for better performance
+    query_fallback = f"""
+        SELECT
+            responses.id,
+            responses.dataset,
+            responses.identifier,
+            responses.prompt_title,
+            responses.prompt_body,
+            responses.model_response_text,
+            responses.model_id,
+            responses.run_id,
+            responses.metadata_json,
+            responses.created_at,
+            COALESCE(counts.review_count, 0) AS review_count,
+            COALESCE(counts.reviewer_review_count, 0) AS reviewer_review_count
+        FROM llm_responses AS responses
+        LEFT JOIN (
+            SELECT 
+                llm_response_id, 
+                COUNT(*) AS review_count,
+                SUM(CASE WHEN reviewer_code = ? THEN 1 ELSE 0 END) AS reviewer_review_count
+            FROM reviews
+            GROUP BY llm_response_id
+        ) AS counts ON counts.llm_response_id = responses.id
+        WHERE {where_sql}
+        ORDER BY 
+            reviewer_review_count ASC,     -- Items reviewer has seen fewer times first
+            review_count ASC,              -- Items with fewer reviews first (3→4 before 4→5)
+            responses.created_at ASC, 
+            responses.id ASC
+        LIMIT 1
+    """
+
+    # Add reviewer_code parameter for the reviewer-specific count
+    fallback_params = params.copy()
+    fallback_params.append(reviewer_code)
+    
+    result = client.execute(query_fallback, fallback_params)
     if not result.rows:
         return None
     return result.to_dicts()[0]
@@ -389,3 +435,4 @@ __all__ = [
     "update_response_row",
     "update_review",
 ]
+

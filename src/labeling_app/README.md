@@ -76,6 +76,22 @@ The platform uses prioritized coverage to ensure balanced review collection:
 1. **2→3 reviews**: Items needing a third review (highest priority)
 2. **1→2 reviews**: Items moving from one to two reviews  
 3. **0→1 reviews**: Brand-new items (lowest priority)
+4. **3+ reviews**: Items that already have 3+ reviews (fallback only)
+
+### Assignment Algorithm
+The platform uses a two-tier priority system:
+
+**Primary Tier**: Items with <3 reviews are prioritized to quickly reach the target of 3 reviews per item
+- Items with 2 reviews get highest priority (2→3)
+- Items with 1 review get medium priority (1→2)  
+- Items with 0 reviews get lowest priority (0→1)
+
+**Fallback Tier**: Items with ≥3 reviews are only assigned when no items with <3 reviews are available
+- This allows reviewers to continue working even after all items have reached 3 reviews
+- No hard limit on maximum reviews per item
+- Ensures reviewers who have exhausted all <3 review items can still contribute
+- **Balanced distribution**: Prioritizes items with fewer reviews (3→4 before 4→5) to even out review counts
+- **Reviewer fairness**: Deprioritizes items based on how many times the reviewer has seen them (1 time < 3 times)
 
 ### Duplicate Prevention
 - Reviewers cannot see the same item twice until they've reviewed every item in the dataset at least once
