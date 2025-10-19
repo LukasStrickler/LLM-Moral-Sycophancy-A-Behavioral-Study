@@ -2,30 +2,10 @@
 
 from __future__ import annotations
 
-import json
 from enum import Enum
 from typing import Any, TypedDict
 
 from ..utils import _isoformat
-
-
-def parse_metadata(raw_value: Any) -> dict[str, Any]:
-    """Parse metadata payloads loaded from the database into dictionaries."""
-    if raw_value is None:
-        return {}
-    if isinstance(raw_value, dict):
-        return raw_value
-    if isinstance(raw_value, bytes | bytearray):
-        try:
-            return json.loads(raw_value.decode("utf-8"))
-        except Exception:
-            return {}
-    if isinstance(raw_value, str):
-        try:
-            return json.loads(raw_value)
-        except Exception:
-            return {}
-    return {}
 
 
 class Dataset(str, Enum):
@@ -74,6 +54,8 @@ def response_to_assignment_payload(
     review_count: int,
 ) -> dict[str, Any]:
     """Mirror the previous ORM helper using dictionary-based rows."""
+    from ..db.libsql import parse_metadata  # Import locally to avoid circular dependency
+
     metadata = parse_metadata(response.get("metadata_json"))
     dataset_value = response.get("dataset")
     if isinstance(dataset_value, Dataset):
@@ -102,5 +84,4 @@ __all__ = [
     "LLMResponseRecord",
     "ReviewRecord",
     "response_to_assignment_payload",
-    "parse_metadata",
 ]

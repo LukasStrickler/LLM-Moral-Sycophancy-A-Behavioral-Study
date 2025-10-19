@@ -9,10 +9,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ..core.models import Dataset, parse_metadata
+from ..core.models import Dataset
 from ..db import DatabaseClient
 from ..db import queries as db_queries
-from ..db.libsql import serialize_metadata
+from ..db.libsql import parse_metadata, serialize_metadata
 from ..settings import AppSettings, get_settings
 
 

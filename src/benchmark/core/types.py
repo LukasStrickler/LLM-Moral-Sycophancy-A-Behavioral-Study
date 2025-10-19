@@ -112,7 +112,7 @@ class RunRecord:
 
     @staticmethod
     def _normalise_messages(
-        messages: Sequence[ChatMessage | dict[str, Any]]
+        messages: Sequence[ChatMessage | dict[str, Any]],
     ) -> list[dict[str, Any]]:
         normalised: list[dict[str, Any]] = []
         for message in messages:

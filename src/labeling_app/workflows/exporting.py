@@ -7,9 +7,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ..core.models import Dataset, parse_metadata, response_to_assignment_payload
+from ..core.models import Dataset, response_to_assignment_payload
 from ..db import DatabaseClient
 from ..db import queries as db_queries
+from ..db.libsql import parse_metadata
 from ..settings import AppSettings, get_settings
 from ..utils import _isoformat
 

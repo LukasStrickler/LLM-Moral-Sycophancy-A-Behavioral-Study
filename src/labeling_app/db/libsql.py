@@ -217,9 +217,7 @@ def ensure_schema(client: DatabaseClient) -> None:
         "CREATE INDEX IF NOT EXISTS ix_reviews_reviewer_dataset ON reviews(reviewer_code)"
     )
     # Critical: JOIN performance for review counts
-    client.execute(
-        "CREATE INDEX IF NOT EXISTS ix_reviews_response_id ON reviews(llm_response_id)"
-    )
+    client.execute("CREATE INDEX IF NOT EXISTS ix_reviews_response_id ON reviews(llm_response_id)")
     # Optimization: Reviewer-specific queries
     client.execute(
         "CREATE INDEX IF NOT EXISTS ix_reviews_reviewer_response ON reviews(reviewer_code, llm_response_id)"

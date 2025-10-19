@@ -102,7 +102,7 @@ def next_response_candidate(
         params.extend(reviewed_list)
 
     where_sql = " AND ".join(clauses)
-    
+
     # First pass: prioritize items with <3 reviews (2→3, 1→2, 0→1)
     query_primary = f"""
         SELECT
@@ -131,7 +131,7 @@ def next_response_candidate(
     result = client.execute(query_primary, params)
     if result.rows:
         return result.to_dicts()[0]
-    
+
     # Fallback pass: if no items with <3 reviews available, allow items with ≥3 reviews
     # Prioritize items with fewer reviews (3→4, 4→5) and deprioritize items reviewer has already seen
     # Use combined aggregation for better performance
@@ -170,7 +170,7 @@ def next_response_candidate(
     # Add reviewer_code parameter for the reviewer-specific count
     fallback_params = params.copy()
     fallback_params.append(reviewer_code)
-    
+
     result = client.execute(query_fallback, fallback_params)
     if not result.rows:
         return None
@@ -435,4 +435,3 @@ __all__ = [
     "update_response_row",
     "update_review",
 ]
-
