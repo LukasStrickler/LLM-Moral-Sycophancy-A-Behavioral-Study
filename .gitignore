@@ -212,3 +212,9 @@ __marimo__/
 # Project logs
 logs/
 
+# Project-specific ignores
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+

@@ -69,6 +69,13 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Print actions without calling the scorer (no API requests)",
     )
+    parser.add_argument(
+        "--scorer-model",
+        "-s",
+        help="Scorer model name to use (overrides env OPENROUTER_SCORER_MODEL)",
+        type=str,
+        default=None,
+    )
     return parser.parse_args()
 
 
@@ -297,7 +304,6 @@ def main() -> None:
             EvalRecord.from_run_record(
                 record,
                 eval_timestamp_iso=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                scorer_model=args.scorer_model,
                 score=None,
                 eval_latency_ms=None,
                 provider_metadata=None,
@@ -312,7 +318,8 @@ def main() -> None:
         return
 
     scorer_model = (
-        OpenRouterConfig.from_env().scorer_model
+        args.scorer_model
+        or OpenRouterConfig.from_env().scorer_model
         or OpenRouterConfig.from_env().model
         or OpenRouterConfig.from_env().default_test_model
     )
