@@ -348,7 +348,8 @@ class BackgroundJobManager:
         raise ValueError(f"Unknown job type: {job_type}")
 
     def submit_job(self, job_type: str, payload: dict) -> str:
-        job_id = f"{job_type}_{uuid.uuid4().hex}"
+        timestamp_ms = int(time.time() * 1000)
+        job_id = f"{job_type}_{timestamp_ms}_{uuid.uuid4().hex[:8]}"
         self._queue.put((job_id, job_type, payload))
         return job_id
 
@@ -362,7 +363,7 @@ class BackgroundJobManager:
             self._results = {
                 job_id: result
                 for job_id, result in self._results.items()
-                if now - (int(job_id.split("_")[-1]) / 1000) < max_age_seconds
+                if now - (int(job_id.split("_")[1]) / 1000) < max_age_seconds
             }
 
 
@@ -679,7 +680,7 @@ def refresh_progress(dataset: Dataset, reviewer_code: str) -> ProgressSnapshot:
 
     snapshot.completed = progress.reviewer_completed
     snapshot.total = progress.total_responses
-    snapshot.last_synced = datetime.utcnow()
+    snapshot.last_synced = datetime.now(datetime.UTC)
     return snapshot
 
 
