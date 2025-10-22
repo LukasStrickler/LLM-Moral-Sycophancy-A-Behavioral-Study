@@ -10,7 +10,7 @@ import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from html import escape
 from pathlib import Path
 from typing import Any, Final, TypeVar
@@ -680,7 +680,7 @@ def refresh_progress(dataset: Dataset, reviewer_code: str) -> ProgressSnapshot:
 
     snapshot.completed = progress.reviewer_completed
     snapshot.total = progress.total_responses
-    snapshot.last_synced = datetime.now(datetime.UTC)
+    snapshot.last_synced = datetime.now(timezone.utc)
     return snapshot
 
 
