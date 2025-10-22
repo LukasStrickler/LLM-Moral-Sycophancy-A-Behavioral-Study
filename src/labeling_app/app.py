@@ -363,7 +363,7 @@ class BackgroundJobManager:
             self._results = {
                 job_id: result
                 for job_id, result in self._results.items()
-                if now - (int(job_id.split("_")[1]) / 1000) < max_age_seconds
+                if now - (int(job_id.rsplit("_", 2)[1]) / 1000) < max_age_seconds
             }
 
 
