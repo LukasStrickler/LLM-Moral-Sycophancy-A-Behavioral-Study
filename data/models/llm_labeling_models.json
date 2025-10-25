@@ -1,0 +1,62 @@
+[
+  {
+    "id": "openai/gpt-oss-20b:free",
+    "label": "GPT-OSS-20B (free)",
+    "provider": "OpenRouter",
+    "rate_limit": {
+      "rps": 0.367,
+      "burst": 5
+    },
+    "concurrency": 3
+  },
+  {
+    "id": "tngtech/deepseek-r1t2-chimera:free",
+    "label": "DeepSeek R1T2 Chimera (free)",
+    "provider": "OpenRouter",
+    "rate_limit": {
+      "rps": 0.367,
+      "burst": 5
+    },
+    "concurrency": 3
+  },
+  {
+    "id": "deepseek/deepseek-chat-v3-0324:free",
+    "label": "DeepSeek Chat v3 (free)",
+    "provider": "OpenRouter",
+    "rate_limit": {
+      "rps": 0.367,
+      "burst": 5
+    },
+    "concurrency": 3
+  },
+  {
+    "id": "z-ai/glm-4.5-air:free",
+    "label": "GLM-4.5 Air (free)",
+    "provider": "OpenRouter",
+    "rate_limit": {
+      "rps": 0.367,
+      "burst": 5
+    },
+    "concurrency": 3
+  },
+  {
+    "id": "google/gemini-2.0-flash-exp:free",
+    "label": "Gemini 2.0 Flash Exp (free)",
+    "provider": "OpenRouter",
+    "rate_limit": {
+      "rps": 0.367,
+      "burst": 5
+    },
+    "concurrency": 3
+  },
+  {
+    "id": "meta-llama/llama-3.3-70b-instruct:free",
+    "label": "Llama 3.3 70B Instruct (free)",
+    "provider": "OpenRouter",
+    "rate_limit": {
+      "rps": 0.367,
+      "burst": 5
+    },
+    "concurrency": 3
+  }
+]
