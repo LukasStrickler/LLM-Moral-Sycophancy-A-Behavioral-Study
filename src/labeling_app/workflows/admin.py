@@ -121,10 +121,11 @@ def seed_datasets(
                     ((note + " ") if note else "")
                     + f"Skipped {len(skipped_messages)} run records (e.g., {skipped_messages[0]})."
                 )
-            elif run_file:
-                note = f"Run file not found: {run_file}"
-            else:
-                note = "No scenario run file detected; using seed payloads only."
+            elif dataset is Dataset.SCENARIO:
+                if run_file and not (used_run_file and source == "run"):
+                    note = f"Run file not found: {run_file}"
+                elif not run_file:
+                    note = "No scenario run file detected; using seed payloads only."
 
             diff = seeding.sync_dataset(client, dataset, payloads, apply_changes=apply)
             total_responses = queries.count_responses(client, dataset)

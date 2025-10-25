@@ -72,7 +72,7 @@ class AssignmentService:
 
         return response_to_assignment_payload(
             candidate,
-            review_count=int(candidate.get("review_count", 0)),
+            review_count=int(candidate.get("review_count") or 0),
         )
 
     def submit_review(

@@ -313,6 +313,52 @@ def status(
         console.print(table)
 
 
+@app.command("delete-llm-reviews")
+def delete_llm_reviews(
+    dataset: str = typer.Option("aita"),
+    confirm: bool = typer.Option(False, "--yes"),
+) -> None:
+    """Delete all LLM-generated reviews from the database."""
+    settings = _require_settings()
+    dataset_enum = _parse_dataset(dataset)
+    
+    with client_scope(settings) as client:
+        # Count LLM reviews
+        count_query = """
+        SELECT COUNT(*) as count
+        FROM reviews r
+        JOIN llm_responses resp ON r.llm_response_id = resp.id
+        WHERE r.reviewer_code LIKE 'llm:%' AND resp.dataset = ?
+        """
+        count = client.execute(count_query, [dataset_enum.value]).first_value()
+        
+        if count == 0:
+            console.print("No LLM reviews found.")
+            return
+        
+        console.print(f"Found {count} LLM reviews for dataset '{dataset}'")
+        
+        if not confirm:
+            response = typer.confirm(f"Are you sure you want to delete {count} LLM reviews?")
+            if not response:
+                console.print("Cancelled.")
+                return
+        
+        # Delete LLM reviews
+        delete_query = """
+        DELETE FROM reviews
+        WHERE id IN (
+            SELECT r.id
+            FROM reviews r
+            JOIN llm_responses resp ON r.llm_response_id = resp.id
+            WHERE r.reviewer_code LIKE 'llm:%' AND resp.dataset = ?
+        )
+        """
+        client.execute(delete_query, [dataset_enum.value])
+        
+        console.print(f"✅ Deleted {count} LLM reviews from {dataset} dataset")
+
+
 def main() -> None:
     app()
 

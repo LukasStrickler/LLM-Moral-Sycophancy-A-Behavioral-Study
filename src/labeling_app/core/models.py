@@ -58,7 +58,9 @@ def response_to_assignment_payload(
 
     metadata = parse_metadata(response.get("metadata_json"))
     dataset_value = response.get("dataset")
-    if isinstance(dataset_value, Dataset):
+    if dataset_value is None:
+        dataset_str = None
+    elif isinstance(dataset_value, Dataset):
         dataset_str = dataset_value.value
     elif isinstance(dataset_value, str):
         dataset_str = dataset_value
