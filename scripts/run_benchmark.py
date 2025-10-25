@@ -37,7 +37,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=9999, help="Number of prompts per model")
     parser.add_argument("--include-neutral", action="store_true", help="Include neutral prompts")
     parser.add_argument(
-        "--models", type=str, default="data/models.json", help="Ordered model list JSON"
+        "--models", type=str, default="data/models/benchmark_models.json", help="Ordered model list JSON"
     )
     parser.add_argument("--model", type=str, help="Run a single model id")
     parser.add_argument("--out", type=str, help="Custom run output path or JSONL file")
