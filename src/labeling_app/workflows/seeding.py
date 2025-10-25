@@ -363,7 +363,7 @@ def _payload_from_run_record(
     response_text = record.get("response_text")
     messages = record.get("messages") or []
     user_messages = [msg for msg in messages if msg.get("role") == "user"]
-    prompt_body = user_messages[-1]["content"] if user_messages else record.get("prompt") or ""
+    prompt_body = user_messages[-1].get("content") or record.get("prompt", "") if user_messages else record.get("prompt", "")
 
     if not all([prompt_id, perspective, model_id]):
         raise SeedError("missing prompt_id/perspective/model_id")

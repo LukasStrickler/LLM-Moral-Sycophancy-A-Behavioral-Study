@@ -67,7 +67,7 @@ def coverage_distribution(client: DatabaseClient, dataset: Dataset) -> dict[int,
             SELECT
                 responses.id,
                 (
-                    SELECT COUNT(*) FROM reviews WHERE reviews.llm_response_id = responses.id
+                    SELECT COUNT(*) FROM reviews WHERE reviews.llm_response_id = responses.id AND reviews.reviewer_code NOT LIKE 'llm:%'
                 ) AS review_count
             FROM llm_responses AS responses
             WHERE responses.dataset = ?
@@ -121,6 +121,7 @@ def next_response_candidate(
         LEFT JOIN (
             SELECT llm_response_id, COUNT(*) AS review_count
             FROM reviews
+            WHERE reviewer_code NOT LIKE 'llm:%'
             GROUP BY llm_response_id
         ) AS review_counts ON review_counts.llm_response_id = responses.id
         WHERE {where_sql} AND COALESCE(review_counts.review_count, 0) < 3
@@ -156,6 +157,7 @@ def next_response_candidate(
                 COUNT(*) AS review_count,
                 SUM(CASE WHEN reviewer_code = ? THEN 1 ELSE 0 END) AS reviewer_review_count
             FROM reviews
+            WHERE reviewer_code NOT LIKE 'llm:%'
             GROUP BY llm_response_id
         ) AS counts ON counts.llm_response_id = responses.id
         WHERE {where_sql}
@@ -196,14 +198,22 @@ def insert_review(
     reviewer_code: str,
     score: float,
     notes: str | None,
-) -> None:
-    client.execute(
-        """
-        INSERT INTO reviews (llm_response_id, reviewer_code, score, notes)
-        VALUES (?, ?, ?, ?)
-        """,
-        [response_id, reviewer_code, score, notes],
-    )
+) -> bool:
+    """Insert review, returns True if inserted, False if already exists."""
+    try:
+        client.execute(
+            """
+            INSERT INTO reviews (llm_response_id, reviewer_code, score, notes)
+            VALUES (?, ?, ?, ?)
+            """,
+            [response_id, reviewer_code, score, notes],
+        )
+        return True
+    except Exception as e:
+        # Check if it's a duplicate (UNIQUE constraint violation)
+        if "UNIQUE constraint failed" in str(e):
+            return False
+        raise
 
 
 def update_review(
@@ -416,7 +426,57 @@ def select_reviews_for_export(client: DatabaseClient, dataset: Dataset) -> list[
     ).to_dicts()
 
 
+def count_llm_reviews(client: DatabaseClient, dataset: Dataset, model_id: str) -> int:
+    """Count reviews from a specific LLM model."""
+    reviewer_code = f"llm:{model_id}"
+    return int(
+        client.execute(
+            """
+            SELECT COUNT(*)
+            FROM reviews
+            JOIN llm_responses AS responses ON responses.id = reviews.llm_response_id
+            WHERE reviews.reviewer_code = ? AND responses.dataset = ?
+            """,
+            [reviewer_code, dataset.value],
+        ).first_value(0)
+    )
+
+
+def get_unlabeled_responses(
+    client: DatabaseClient, 
+    dataset: Dataset, 
+    reviewer_code: str,
+    limit: int | None = None
+) -> list[dict]:
+    """Get responses not yet reviewed by specified reviewer."""
+    query = """
+        SELECT
+            responses.id,
+            responses.dataset,
+            responses.identifier,
+            responses.prompt_title,
+            responses.prompt_body,
+            responses.model_response_text,
+            responses.model_id,
+            responses.run_id,
+            responses.metadata_json,
+            responses.created_at
+        FROM llm_responses AS responses
+        LEFT JOIN reviews ON reviews.llm_response_id = responses.id AND reviews.reviewer_code = ?
+        WHERE responses.dataset = ? AND reviews.id IS NULL
+        ORDER BY responses.created_at ASC
+    """
+    
+    params = [reviewer_code, dataset.value]
+    if limit is not None:
+        query += " LIMIT ?"
+        params.append(limit)
+    
+    return client.execute(query, params).to_dicts()
+
+
 __all__ = [
+    "count_llm_reviews",
     "count_responses",
     "count_reviewer_completed",
     "coverage_distribution",
@@ -425,6 +485,7 @@ __all__ = [
     "find_review_id",
     "get_response_dataset",
     "get_reviewed_response_ids",
+    "get_unlabeled_responses",
     "insert_response_row",
     "insert_review",
     "next_response_candidate",
