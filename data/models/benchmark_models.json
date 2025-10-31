@@ -1,22 +1,134 @@
 [
   {
-    "id": "openai/gpt-oss-20b:free",
-    "label": "GPT-OSS-20B (free)",
-    "provider": "OpenRouter",
-    "rate_limit": {
-      "rps": 0.367,
-      "burst": 5
-    },
+    "id": "google/gemini-2.5-pro",
+    "label": "Gemini 2.5 Pro",
+    "provider": "Google AI Studio",
+    "concurrency": 2
+  },
+  {
+    "id": "google/gemini-2.5-flash",
+    "label": "Gemini 2.5 Flash",
+    "provider": "Google AI Studio",
     "concurrency": 3
   },
   {
-    "id": "nvidia/nemotron-nano-9b-v2:free",
+    "id": "google/gemini-2.5-flash-lite",
+    "label": "Gemini 2.5 Flash Lite",
+    "provider": "Google AI Studio",
+    "concurrency": 3
+  },
+  {
+    "id": "google/gemini-2.0-flash",
+    "label": "Gemini 2.0 Flash",
+    "provider": "Google AI Studio",
+    "concurrency": 3
+  },
+  {
+    "id": "google/gemini-2.0-flash-exp",
+    "label": "Gemini 2.0 Flash Exp",
+    "provider": "Google AI Studio",
+    "concurrency": 3
+  },
+  {
+    "id": "google/gemini-2.0-flash-lite",
+    "label": "Gemini 2.0 Flash Lite",
+    "provider": "Google AI Studio",
+    "concurrency": 3
+  },
+  {
+    "id": "groq/llama-3.3-70b",
+    "label": "Llama 3.3 70B (Groq)",
+    "provider": "Groq",
+    "concurrency": 3
+  },
+  {
+    "id": "groq/llama-3.1-8b",
+    "label": "Llama 3.1 8B (Groq)",
+    "provider": "Groq",
+    "concurrency": 3
+  },
+  {
+    "id": "groq/gpt-oss-20b",
+    "label": "GPT-OSS 20B (Groq)",
+    "provider": "Groq",
+    "concurrency": 3
+  },
+  {
+    "id": "groq/gpt-oss-120b",
+    "label": "GPT-OSS 120B (Groq)",
+    "provider": "Groq",
+    "concurrency": 3
+  },
+  {
+    "id": "groq/qwen-3-32b",
+    "label": "Qwen 3 32B (Groq)",
+    "provider": "Groq",
+    "concurrency": 3
+  },
+  {
+    "id": "huggingface/qwen-2.5-72b",
+    "label": "Qwen 2.5 72B",
+    "provider": "Hugging Face",
+    "concurrency": 3
+  },
+  {
+    "id": "huggingface/phi-3.5-mini",
+    "label": "Phi-3.5 Mini",
+    "provider": "Hugging Face",
+    "concurrency": 3
+  },
+  {
+    "id": "cerebras/llama-3.1-70b",
+    "label": "Llama 3.1 70B (Cerebras)",
+    "provider": "Cerebras",
+    "concurrency": 3
+  },
+  {
+    "id": "mistral/mistral-small",
+    "label": "Mistral Small",
+    "provider": "Mistral AI",
+    "concurrency": 3
+  },
+  {
+    "id": "mistral/mistral-nemo",
+    "label": "Mistral Nemo",
+    "provider": "Mistral AI",
+    "concurrency": 3
+  },
+  {
+    "id": "cohere/command-r-plus",
+    "label": "Command R+",
+    "provider": "Cohere",
+    "concurrency": 3
+  },
+  {
+    "id": "cohere/command-r",
+    "label": "Command R",
+    "provider": "Cohere",
+    "concurrency": 3
+  },
+  {
+    "id": "openrouter/deepseek/deepseek-chat-v3-0324:free",
+    "label": "DeepSeek Chat v3 (free)",
+    "provider": "OpenRouter",
+    "concurrency": 3
+  },
+  {
+    "id": "openrouter/z-ai/glm-4.5-air:free",
+    "label": "GLM-4.5 Air (free)",
+    "provider": "OpenRouter",
+    "concurrency": 3
+  },
+  {
+    "id": "openrouter/nvidia/nemotron-nano-9b-v2:free",
     "label": "Nemotron Nano 9B v2 (free)",
     "provider": "OpenRouter",
-    "rate_limit": {
-      "rps": 0.367,
-      "burst": 5
-    },
+    "concurrency": 3
+  },
+  {
+    "id": "openrouter/tngtech/deepseek-r1t2-chimera:free",
+    "label": "DeepSeek R1T2 Chimera (free)",
+    "provider": "OpenRouter",
     "concurrency": 3
   }
 ]

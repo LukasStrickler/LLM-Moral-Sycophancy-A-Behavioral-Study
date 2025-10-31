@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 import json
-import logging
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ...benchmark.core.logging import setup_logger
 from ..core.models import Dataset
 from ..db import DatabaseClient
 from ..db import queries as db_queries
 from ..db.libsql import parse_metadata, serialize_metadata
 from ..settings import AppSettings, get_settings
+
+logger = setup_logger("seeding")
 
 
 def _validate_identifier(identifier: str, context: str = "") -> tuple[str, str]:

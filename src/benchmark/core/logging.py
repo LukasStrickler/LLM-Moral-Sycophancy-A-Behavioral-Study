@@ -43,6 +43,28 @@ DISPLAY_NAME_OVERRIDES: dict[str, str] = {
     "main": "main",
 }
 
+# Provider name normalization for display
+PROVIDER_NAME_MAP: dict[str, str] = {
+    "openrouter": "OR",
+    "google_ai_studio": "GoogleAI",
+    "gemini": "GoogleAI",
+    "groq": "Groq",
+    "huggingface": "HF",
+    "hugging_face": "HF",
+    "cerebras": "Cerebras",
+    "mistral": "Mistral",
+    "cohere": "Cohere",
+}
+
+
+def normalize_provider_name(provider: str | None) -> str:
+    """Normalize provider name for consistent display."""
+    if not provider:
+        return ""
+    provider_lower = provider.lower().replace("-", "_").replace(" ", "_")
+    return PROVIDER_NAME_MAP.get(provider_lower, provider[:10].title())
+
+
 MODEL_PREFIX_WIDTH = 20
 TAG_PREFIX_WIDTH = 9
 PROGRESS_PREFIX_WIDTH = 7
@@ -229,3 +251,24 @@ def setup_logger(name: str, log_file: Path | None = None) -> logging.Logger:
         _REGISTERED_LOGGERS.setdefault(name, logger)
 
     return logger
+
+
+def configure_litellm_logging() -> None:
+    """Configure LiteLLM's internal logging to respect our LOG_LEVEL."""
+    try:
+        import litellm
+    except ImportError:
+        return  # LiteLLM not installed yet
+
+    level_name_raw = os.getenv("LOG_LEVEL", "INFO")
+    level_name = level_name_raw.upper()
+    level = getattr(logging, level_name, None)
+    if not isinstance(level, int):
+        level = logging.INFO
+
+    # Configure LiteLLM to use our logging level
+    litellm.set_verbose = level <= logging.DEBUG
+    # Suppress LiteLLM's internal loggers unless we're in DEBUG mode
+    if level > logging.DEBUG:
+        logging.getLogger("LiteLLM").setLevel(logging.WARNING)
+        logging.getLogger("litellm").setLevel(logging.WARNING)

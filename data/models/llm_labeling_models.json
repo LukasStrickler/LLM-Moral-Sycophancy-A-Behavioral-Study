@@ -1,62 +1,181 @@
 [
   {
-    "id": "openai/gpt-oss-20b:free",
-    "label": "GPT-OSS-20B (free)",
-    "provider": "OpenRouter",
-    "rate_limit": {
-      "rps": 0.367,
-      "burst": 5
-    },
+    "id": "google/gemini-2.5-pro",
+    "label": "Gemini 2.5 Pro",
+    "provider": "Google AI Studio",
+    "concurrency": 2
+  },
+  {
+    "id": "google/gemini-2.5-flash",
+    "label": "Gemini 2.5 Flash",
+    "provider": "Google AI Studio",
     "concurrency": 3
   },
   {
-    "id": "tngtech/deepseek-r1t2-chimera:free",
-    "label": "DeepSeek R1T2 Chimera (free)",
-    "provider": "OpenRouter",
-    "rate_limit": {
-      "rps": 0.367,
-      "burst": 5
-    },
+    "id": "google/gemini-2.5-flash-lite",
+    "label": "Gemini 2.5 Flash Lite",
+    "provider": "Google AI Studio",
     "concurrency": 3
   },
   {
-    "id": "deepseek/deepseek-chat-v3-0324:free",
+    "id": "google/gemini-2.0-flash",
+    "label": "Gemini 2.0 Flash",
+    "provider": "Google AI Studio",
+    "concurrency": 3
+  },
+  {
+    "id": "google/gemini-2.0-flash-exp",
+    "label": "Gemini 2.0 Flash Exp",
+    "provider": "Google AI Studio",
+    "concurrency": 3
+  },
+  {
+    "id": "google/gemini-2.0-flash-lite",
+    "label": "Gemini 2.0 Flash Lite",
+    "provider": "Google AI Studio",
+    "concurrency": 3
+  },
+  {
+    "id": "groq/llama-3.3-70b-versatile",
+    "label": "Llama 3.3 70B Versatile (Groq)",
+    "provider": "Groq",
+    "concurrency": 3
+  },
+  {
+    "id": "groq/llama-3.1-8b-instant",
+    "label": "Llama 3.1 8B Instant (Groq)",
+    "provider": "Groq",
+    "concurrency": 3
+  },
+  {
+    "id": "groq/openai/gpt-oss-20b",
+    "label": "GPT-OSS 20B (Groq)",
+    "provider": "Groq",
+    "concurrency": 3
+  },
+  {
+    "id": "groq/openai/gpt-oss-120b",
+    "label": "GPT-OSS 120B (Groq)",
+    "provider": "Groq",
+    "concurrency": 3
+  },
+  {
+    "id": "groq/qwen/qwen3-32b",
+    "label": "Qwen 3 32B (Groq)",
+    "provider": "Groq",
+    "concurrency": 3
+  },
+  {
+    "id": "groq/meta-llama/llama-4-maverick-17b-128e-instruct",
+    "label": "Llama 4 Maverick 17B 128E (Groq)",
+    "provider": "Groq",
+    "concurrency": 3
+  },
+  {
+    "id": "groq/meta-llama/llama-4-scout-17b-16e-instruct",
+    "label": "Llama 4 Scout 17B 16E (Groq)",
+    "provider": "Groq",
+    "concurrency": 3
+  },
+  {
+    "id": "groq/groq/compound",
+    "label": "Compound (Groq)",
+    "provider": "Groq",
+    "concurrency": 3
+  },
+  {
+    "id": "groq/groq/compound-mini",
+    "label": "Compound Mini (Groq)",
+    "provider": "Groq",
+    "concurrency": 3
+  },
+  {
+    "id": "groq/moonshotai/kimi-k2-instruct",
+    "label": "Kimi K2 Instruct (Groq)",
+    "provider": "Groq",
+    "concurrency": 3
+  },  {
+    "id": "huggingface/qwen-2.5-72b",
+    "label": "Qwen 2.5 72B",
+    "provider": "Hugging Face",
+    "concurrency": 3
+  },
+  {
+    "id": "huggingface/phi-3.5-mini",
+    "label": "Phi-3.5 Mini",
+    "provider": "Hugging Face",
+    "concurrency": 3
+  },
+  {
+    "id": "cerebras/llama-3.1-70b",
+    "label": "Llama 3.1 70B (Cerebras)",
+    "provider": "Cerebras",
+    "concurrency": 3
+  },
+  {
+    "id": "mistral/mistral-small-latest",
+    "label": "Mistral Small",
+    "provider": "Mistral AI",
+    "concurrency": 3
+  },
+  {
+    "id": "mistral/mistral-large-latest",
+    "label": "Mistral Large",
+    "provider": "Mistral AI",
+    "concurrency": 2
+  },
+  {
+    "id": "mistral/mistral-medium-latest",
+    "label": "Mistral Medium",
+    "provider": "Mistral AI",
+    "concurrency": 2
+  },
+  {
+    "id": "mistral/magistral-medium-2506",
+    "label": "Magistral Medium",
+    "provider": "Mistral AI",
+    "concurrency": 2
+  },
+  {
+    "id": "cohere/command-r-plus-08-2024",
+    "label": "Command R+ (08-2024)",
+    "provider": "Cohere",
+    "concurrency": 3
+  },
+  {
+    "id": "cohere/command-r-08-2024",
+    "label": "Command R (08-2024)",
+    "provider": "Cohere",
+    "concurrency": 3
+  },
+  {
+    "id": "cohere/command-a-03-2025",
+    "label": "Command A (03-2025)",
+    "provider": "Cohere",
+    "concurrency": 3
+  },
+  {
+    "id": "openrouter/deepseek/deepseek-chat-v3-0324:free",
     "label": "DeepSeek Chat v3 (free)",
     "provider": "OpenRouter",
-    "rate_limit": {
-      "rps": 0.367,
-      "burst": 5
-    },
     "concurrency": 3
   },
   {
-    "id": "z-ai/glm-4.5-air:free",
+    "id": "openrouter/z-ai/glm-4.5-air:free",
     "label": "GLM-4.5 Air (free)",
     "provider": "OpenRouter",
-    "rate_limit": {
-      "rps": 0.367,
-      "burst": 5
-    },
     "concurrency": 3
   },
   {
-    "id": "google/gemini-2.0-flash-exp:free",
-    "label": "Gemini 2.0 Flash Exp (free)",
+    "id": "openrouter/nvidia/nemotron-nano-9b-v2:free",
+    "label": "Nemotron Nano 9B v2 (free)",
     "provider": "OpenRouter",
-    "rate_limit": {
-      "rps": 0.367,
-      "burst": 5
-    },
     "concurrency": 3
   },
   {
-    "id": "meta-llama/llama-3.3-70b-instruct:free",
-    "label": "Llama 3.3 70B Instruct (free)",
+    "id": "openrouter/tngtech/deepseek-r1t2-chimera:free",
+    "label": "DeepSeek R1T2 Chimera (free)",
     "provider": "OpenRouter",
-    "rate_limit": {
-      "rps": 0.367,
-      "burst": 5
-    },
     "concurrency": 3
   }
 ]

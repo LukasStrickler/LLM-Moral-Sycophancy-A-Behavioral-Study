@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-PREFERRED_TEST_MODEL = "openai/gpt-oss-20b:free"
+PREFERRED_TEST_MODEL = "google/gemini-2.0-flash-exp"
 
 
 def _unique_preserve_order(items: list[str]) -> list[str]:

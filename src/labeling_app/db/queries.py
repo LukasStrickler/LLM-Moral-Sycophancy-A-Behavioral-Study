@@ -443,10 +443,7 @@ def count_llm_reviews(client: DatabaseClient, dataset: Dataset, model_id: str) -
 
 
 def get_unlabeled_responses(
-    client: DatabaseClient, 
-    dataset: Dataset, 
-    reviewer_code: str,
-    limit: int | None = None
+    client: DatabaseClient, dataset: Dataset, reviewer_code: str, limit: int | None = None
 ) -> list[dict]:
     """Get responses not yet reviewed by specified reviewer."""
     query = """
@@ -466,12 +463,12 @@ def get_unlabeled_responses(
         WHERE responses.dataset = ? AND reviews.id IS NULL
         ORDER BY responses.created_at ASC
     """
-    
+
     params = [reviewer_code, dataset.value]
     if limit is not None:
         query += " LIMIT ?"
         params.append(limit)
-    
+
     return client.execute(query, params).to_dicts()
 
 
