@@ -321,7 +321,7 @@ def delete_llm_reviews(
     """Delete all LLM-generated reviews from the database."""
     settings = _require_settings()
     dataset_enum = _parse_dataset(dataset)
-    
+
     with client_scope(settings) as client:
         # Count LLM reviews
         count_query = """
@@ -331,19 +331,19 @@ def delete_llm_reviews(
         WHERE r.reviewer_code LIKE 'llm:%' AND resp.dataset = ?
         """
         count = client.execute(count_query, [dataset_enum.value]).first_value()
-        
+
         if count == 0:
             console.print("No LLM reviews found.")
             return
-        
+
         console.print(f"Found {count} LLM reviews for dataset '{dataset}'")
-        
+
         if not confirm:
             response = typer.confirm(f"Are you sure you want to delete {count} LLM reviews?")
             if not response:
                 console.print("Cancelled.")
                 return
-        
+
         # Delete LLM reviews
         delete_query = """
         DELETE FROM reviews
@@ -355,7 +355,7 @@ def delete_llm_reviews(
         )
         """
         client.execute(delete_query, [dataset_enum.value])
-        
+
         console.print(f"✅ Deleted {count} LLM reviews from {dataset} dataset")
 
 

@@ -118,9 +118,8 @@ def seed_datasets(
                     source = "run"
             if skipped_messages:
                 note = (
-                    ((note + " ") if note else "")
-                    + f"Skipped {len(skipped_messages)} run records (e.g., {skipped_messages[0]})."
-                )
+                    (note + " ") if note else ""
+                ) + f"Skipped {len(skipped_messages)} run records (e.g., {skipped_messages[0]})."
             elif dataset is Dataset.SCENARIO:
                 if run_file and not (used_run_file and source == "run"):
                     note = f"Run file not found: {run_file}"

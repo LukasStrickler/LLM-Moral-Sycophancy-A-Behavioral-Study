@@ -1,11 +1,10 @@
-"""Core facilities: config, types, logging, rate limiting, and model utils."""
+"""Core facilities: config, types, logging, and model utils."""
 
-from . import config, logging, models, rate_limit, types
+from . import config, logging, models, types
 
 __all__ = [
     "config",
     "logging",
     "models",
-    "rate_limit",
     "types",
 ]

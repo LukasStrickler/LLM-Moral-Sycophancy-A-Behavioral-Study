@@ -33,7 +33,7 @@ def ensure_project_on_path() -> None:
 
 if TYPE_CHECKING:
     from src.benchmark.core.types import EvalRecord, ProviderMetadata
-    from src.benchmark.providers.openrouter_client import OpenRouterClient
+    from src.benchmark.providers.litellm_provider import LiteLLMProvider
 else:
     ChatMessage = Any  # runtime placeholder; real class imported lazily in functions
 
@@ -72,7 +72,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--scorer-model",
         "-s",
-        help="Scorer model name to use (overrides env OPENROUTER_SCORER_MODEL)",
+        help="Scorer model name to use (overrides env LLM_SCORER_MODEL)",
         type=str,
         default=None,
     )
@@ -124,7 +124,7 @@ async def _score_record(
     record_index: int,
     record,
     scorer_model: str,
-    client: OpenRouterClient,
+    client: LiteLLMProvider,
     semaphore: asyncio.Semaphore,
     logger: logging.Logger,
 ) -> ScoringOutcome:
@@ -171,9 +171,9 @@ async def score_records(
     scorer_model: str,
     dry_run: bool,
 ) -> dict[int, ScoringOutcome]:
-    from src.benchmark.core.config import OpenRouterConfig, RunConfig
+    from src.benchmark.core.config import ProviderConfig, RunConfig
     from src.benchmark.core.logging import setup_logger
-    from src.benchmark.providers.openrouter_client import OpenRouterClient
+    from src.benchmark.providers.litellm_provider import LiteLLMProvider
 
     logger = setup_logger(__name__)
     if dry_run:
@@ -189,9 +189,9 @@ async def score_records(
             for idx in indices
         }
 
-    cfg = OpenRouterConfig.from_env()
+    cfg = ProviderConfig.from_env()
     run_cfg = RunConfig.from_env()
-    client = OpenRouterClient(cfg, run_cfg)
+    client = LiteLLMProvider(cfg, run_cfg)
     # Use a reasonable default concurrency for scoring (not per-model)
     semaphore = asyncio.Semaphore(3)
 
@@ -246,7 +246,7 @@ def main() -> None:
     args = parse_args()
     load_dotenv()
     ensure_project_on_path()
-    from src.benchmark.core.config import OpenRouterConfig
+    from src.benchmark.core.config import ProviderConfig
     from src.benchmark.core.logging import configure_logging, setup_logger
     from src.benchmark.core.types import EvalRecord
     from src.benchmark.reporting.aggregate import aggregate_run
@@ -317,15 +317,13 @@ def main() -> None:
         logger.info("Wrote evaluation stubs to %s", output_path)
         return
 
-    scorer_model = (
-        args.scorer_model
-        or OpenRouterConfig.from_env().scorer_model
-        or OpenRouterConfig.from_env().model
-        or OpenRouterConfig.from_env().default_test_model
-    )
+    # Cache config to avoid repeated env lookups
+    cfg = ProviderConfig.from_env()
+    scorer_model = args.scorer_model or cfg.scorer_model or cfg.model or cfg.default_test_model
     if scorer_model is None:
         logger.error(
-            "Unable to determine scorer model. Set OPENROUTER_SCORER_MODEL or OPENROUTER_MODEL."
+            "Unable to determine scorer model. "
+            "Set LLM_SCORER_MODEL or LLM_MODEL (or use --scorer-model)."
         )
         sys.exit(1)
 

@@ -35,7 +35,6 @@ LLM-Moral-Sycophancy-A-Behavioral-Study/
 │   │   │   ├── config.py      # Configuration management
 │   │   │   ├── logging.py     # Structured logging
 │   │   │   ├── models.py      # Data models
-│   │   │   ├── rate_limit.py  # Rate limiting utilities
 │   │   │   └── types.py       # Type definitions
 │   │   ├── prompts/           # Prompt generation
 │   │   │   ├── chat.py        # One-sided, natural chat phrasing per perspective
@@ -45,7 +44,7 @@ LLM-Moral-Sycophancy-A-Behavioral-Study/
 │   │   │   └── schema.py      # Scenario dimensions (amounts, qualities)
 │   │   ├── providers/         # LLM provider integrations
 │   │   │   ├── base.py        # Base provider interface
-│   │   │   └── openrouter_client.py  # OpenRouter API client
+│   │   │   └── litellm_provider.py  # LiteLLM multi-provider client
 │   │   ├── reporting/         # Results aggregation
 │   │   │   └── aggregate.py  # Data aggregation utilities
 │   │   ├── run/               # Benchmark execution
@@ -147,7 +146,7 @@ flowchart TD
 
 - **Python 3.10+** (recommended: Python 3.12)
 - **Poetry** for dependency management
-- **OpenRouter API Key** for LLM access
+- **At least one LLM provider API key** (Google AI Studio, Groq, Hugging Face, Cerebras, Mistral AI, Cohere, or OpenRouter)
 
 ### Installation
 
@@ -166,8 +165,15 @@ flowchart TD
    cp .env.example .env
    ```
    
-   Edit `.env` and add your [OpenRouter](https://openrouter.ai/) API key:
+   Edit `.env` and add at least one provider API key (see `.env.example` for all options):
    ```bash
+   # Example: Google AI Studio
+   GOOGLE_AI_API_KEY=your_api_key_here
+   
+   # Or Groq
+   GROQ_API_KEY=your_api_key_here
+   
+   # Or OpenRouter (for multi-provider access)
    OPENROUTER_API_KEY=your_api_key_here
    ```
 
@@ -187,7 +193,7 @@ poetry run python scripts/build_benchmark.py --include-neutral --limit 10
 poetry run python scripts/run_benchmark.py --limit 5 --include-neutral --models data/models.json
 
 # Run a single model
-poetry run python scripts/run_benchmark.py --model openai/gpt-oss-20b:free --limit 5
+poetry run python scripts/run_benchmark.py --model google/gemini-2.0-flash-exp --limit 5
 
 # Dry run (no API calls, for testing)
 poetry run python scripts/run_benchmark.py --dry-run --limit 5
@@ -211,23 +217,15 @@ Edit `data/models.json` to configure which models to benchmark:
 ```json
 [
   {
-    "id": "openai/gpt-oss-20b:free",
-    "label": "GPT-OSS-20B (free)",
-    "provider": "OpenRouter",
-    "rate_limit": {
-      "rps": 0.367,
-      "burst": 5
-    },
+    "id": "google/gemini-2.0-flash-exp",
+    "label": "Gemini 2.0 Flash Exp",
+    "provider": "Google AI Studio",
     "concurrency": 3
   },
   {
-    "id": "nvidia/nemotron-nano-9b-v2:free",
-    "label": "Nemotron Nano 9B v2 (free)",
-    "provider": "OpenRouter",
-    "rate_limit": {
-      "rps": 0.367,
-      "burst": 5
-    },
+    "id": "groq/llama-3.3-70b",
+    "label": "Llama 3.3 70B (Groq)",
+    "provider": "Groq",
     "concurrency": 3
   }
 ]
@@ -238,11 +236,18 @@ Edit `data/models.json` to configure which models to benchmark:
 Key configuration options in `.env`:
 
 ```bash
-# Required
+# Provider API Keys (set at least one)
+GOOGLE_AI_API_KEY=your_api_key_here
+GROQ_API_KEY=your_api_key_here
+HUGGINGFACE_API_KEY=your_api_key_here
+CEREBRAS_API_KEY=your_api_key_here
+MISTRAL_API_KEY=your_api_key_here
+COHERE_API_KEY=your_api_key_here
 OPENROUTER_API_KEY=your_api_key_here
 
 # Optional: Model selection
-OPENROUTER_MODEL=openai/gpt-oss-20b:free
+LLM_MODEL=google/gemini-2.0-flash-exp
+LLM_SCORER_MODEL=google/gemini-2.5-pro
 ```
 
 ### Labeling Platform Setup
@@ -259,25 +264,21 @@ for advanced options and interactive mode.
 
 ### Rate Limiting
 
-The system includes per-model rate limiting and concurrency control optimized for free-tier models:
+The system uses LiteLLM for automatic rate limiting and retry handling across all providers:
 
-- **OpenRouter free models**: 20 requests per minute limit
-- **Default rate**: 0.367 RPS (22 RPM) to maximize throughput
+- **Automatic rate limiting**: LiteLLM respects provider-specific rate limits automatically
+- **Per-provider handling**: Each provider (Google AI Studio, Groq, Hugging Face, etc.) has its own rate limits
 - **Per-model concurrency**: Each model runs independently to prevent blocking
-- **Configuration**: Rate limits and concurrency configured per-model in `data/models.json`
+- **Configuration**: Concurrency configured per-model in `data/models/*.json`
 
-**Important**: Each model in `data/models.json` must specify its own `concurrency` setting. The system will fail if this field is missing.
+**Important**: Each model in `data/models/*.json` must specify its own `concurrency` setting. The system will fail if this field is missing.
 
 Example model configuration:
 ```json
 {
-  "id": "openai/gpt-oss-20b:free",
-  "label": "GPT-OSS-20B (free)",
-  "provider": "OpenRouter",
-  "rate_limit": {
-    "rps": 0.367,
-    "burst": 5
-  },
+  "id": "google/gemini-2.0-flash-exp",
+  "label": "Gemini 2.0 Flash Exp",
+  "provider": "Google AI Studio",
   "concurrency": 3
 }
 ```

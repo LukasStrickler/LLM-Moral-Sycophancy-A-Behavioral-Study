@@ -1,8 +1,8 @@
-"""Provider clients for model APIs (OpenRouter-first)."""
+"""Provider clients for model APIs (LiteLLM multi-provider support)."""
 
-from . import base, openrouter_client
+from . import base, litellm_provider
 
 __all__ = [
-    "openrouter_client",
+    "litellm_provider",
     "base",
 ]

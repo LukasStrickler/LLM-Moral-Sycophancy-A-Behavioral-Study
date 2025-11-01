@@ -79,6 +79,22 @@ def coverage_distribution(client: DatabaseClient, dataset: Dataset) -> dict[int,
     return {int(row[0] or 0): int(row[1] or 0) for row in rows}
 
 
+def get_llm_reviewer_counts(client: DatabaseClient, dataset: Dataset) -> dict[str, int]:
+    """Return counts of completed reviews for all LLM reviewers within a dataset."""
+
+    rows = client.execute(
+        """
+        SELECT reviews.reviewer_code, COUNT(*) AS total
+        FROM reviews
+        JOIN llm_responses AS responses ON responses.id = reviews.llm_response_id
+        WHERE reviews.reviewer_code LIKE 'llm:%' AND responses.dataset = ?
+        GROUP BY reviews.reviewer_code
+        """,
+        [dataset.value],
+    ).rows
+    return {str(row[0]): int(row[1] or 0) for row in rows}
+
+
 def next_response_candidate(
     client: DatabaseClient,
     dataset: Dataset,
@@ -443,10 +459,7 @@ def count_llm_reviews(client: DatabaseClient, dataset: Dataset, model_id: str) -
 
 
 def get_unlabeled_responses(
-    client: DatabaseClient, 
-    dataset: Dataset, 
-    reviewer_code: str,
-    limit: int | None = None
+    client: DatabaseClient, dataset: Dataset, reviewer_code: str, limit: int | None = None
 ) -> list[dict]:
     """Get responses not yet reviewed by specified reviewer."""
     query = """
@@ -466,13 +479,54 @@ def get_unlabeled_responses(
         WHERE responses.dataset = ? AND reviews.id IS NULL
         ORDER BY responses.created_at ASC
     """
-    
+
     params = [reviewer_code, dataset.value]
     if limit is not None:
         query += " LIMIT ?"
         params.append(limit)
-    
+
     return client.execute(query, params).to_dicts()
+
+
+def get_llm_unlabeled_counts(
+    client: DatabaseClient, dataset: Dataset, reviewer_codes: list[str]
+) -> dict[str, int]:
+    """Return number of responses each LLM reviewer still needs to label."""
+
+    if not reviewer_codes:
+        return {}
+
+    placeholders = ", ".join("(?)" for _ in reviewer_codes)
+    sql = f"""
+        WITH targets(reviewer_code) AS (
+            VALUES {placeholders}
+        )
+        SELECT
+            targets.reviewer_code,
+            SUM(
+                CASE
+                    WHEN responses.id IS NULL THEN 0
+                    WHEN NOT EXISTS (
+                        SELECT 1
+                        FROM reviews
+                        WHERE reviews.llm_response_id = responses.id
+                          AND reviews.reviewer_code = targets.reviewer_code
+                    )
+                    THEN 1
+                    ELSE 0
+                END
+            ) AS pending
+        FROM targets
+        LEFT JOIN llm_responses AS responses
+            ON responses.dataset = ?
+        GROUP BY targets.reviewer_code
+    """
+
+    params: list[object] = list(reviewer_codes)
+    params.append(dataset.value)
+    rows = client.execute(sql, params).rows
+    return {str(row[0]): int(row[1] or 0) for row in rows}
+
 
 
 __all__ = [
@@ -486,6 +540,7 @@ __all__ = [
     "get_response_dataset",
     "get_reviewed_response_ids",
     "get_unlabeled_responses",
+    "get_llm_unlabeled_counts",
     "insert_response_row",
     "insert_review",
     "next_response_candidate",
@@ -496,3 +551,4 @@ __all__ = [
     "update_response_row",
     "update_review",
 ]
+

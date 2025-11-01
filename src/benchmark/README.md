@@ -4,17 +4,16 @@ Core benchmarking framework for investigating LLM moral sycophancy behavior.
 
 ## Purpose
 
-Generate rent-scenario prompts → query LLMs via OpenRouter → score responses → write per-run summaries.
+Generate rent-scenario prompts → query LLMs via multiple providers (LiteLLM) → score responses → write per-run summaries.
 
 ## Architecture
 
 ```
 src/benchmark
 ├── core/                     # Foundational utilities
-│   ├── config.py             # Environment-driven settings (OpenRouter, run config)
+│   ├── config.py             # Environment-driven settings (multi-provider, run config)
 │   ├── logging.py            # Structured logging with model/task context
 │   ├── models.py             # Ordered model list loader (dedupe, preferred-first)
-│   ├── rate_limit.py         # Token bucket limiter + exponential backoff
 │   └── types.py              # Core data models (ChatMessage, Factors, etc.)
 ├── prompts/                  # Prompt definitions and builders
 │   ├── schema.py             # Rent scenario dimensions (amounts, qualities)
@@ -23,7 +22,7 @@ src/benchmark
 │   ├── generator.py          # Grid facade (returns flattened triplets)
 │   └── chat.py               # System background + one-sided phrasing per perspective
 ├── providers/                # External API adapters
-│   └── openrouter_client.py  # Async httpx client with retries, rate limiting
+│   └── litellm_provider.py   # LiteLLM wrapper supporting 7 providers
 ├── run/                      # Orchestration
 │   └── runner_async.py       # Bounded-concurrency benchmark execution
 ├── scoring/                  # Evaluation helpers
@@ -69,18 +68,19 @@ This allows detection of sycophantic behavior where LLMs align with user perspec
 
 | Item | Location | Notes |
 |------|----------|-------|
-| API credentials | `.env` → `OPENROUTER_API_KEY` | Required. Optional `OPENROUTER_BASE_URL`, `OPENROUTER_SCORER_MODEL` |
-| Run tuning | env vars `BENCH_CONCURRENCY`, `BENCH_TIMEOUT_S`, `BENCH_MAX_RETRIES` | Defaults optimized for multiple models (concurrency=20, timeout=60s, retries=3) |
-| OpenRouter defaults | `OPENROUTER_MODEL_RPS`, `OPENROUTER_MODEL_BURST` | Provider-level rate caps |
-| Model roster | `data/models.json` | Ordered list of model IDs; keep free models first for smoke tests. **Each model must specify `concurrency`.** |
-| Logging | `LOG_LEVEL` env | INFO by default; DEBUG for verbose traces |
+| API credentials | `.env` → Provider API keys | Set at least one: `GOOGLE_AI_API_KEY`, `GROQ_API_KEY`, `HUGGINGFACE_API_KEY`, `CEREBRAS_API_KEY`, `MISTRAL_API_KEY`, `COHERE_API_KEY`, or `OPENROUTER_API_KEY` |
+| Run tuning | env vars `BENCH_TIMEOUT_S`, `BENCH_MAX_RETRIES` | Defaults: timeout=60s, retries=3. Rate limiting handled by LiteLLM per provider |
+| Model roster | `data/models/*.json` | Ordered list of model IDs; keep free models first for smoke tests. **Each model must specify `concurrency`.** |
+| Logging | `LOG_LEVEL` env | INFO by default; DEBUG for verbose traces. LiteLLM logging integrated automatically |
 
 ## Key Features
 
-- **Async-first execution**: Single `httpx.AsyncClient` with shared token bucket limiter
-- **Provider-scoped rate limiting**: Each provider respects `Retry-After` headers
+- **Multi-provider support**: LiteLLM provides unified access to 7 providers (Google AI Studio, Groq, Hugging Face, Cerebras, Mistral AI, Cohere, OpenRouter)
+- **Async-first execution**: LiteLLM handles async calls with automatic rate limiting and retries
+- **Automatic rate limiting**: LiteLLM respects provider-specific rate limits automatically
+- **Retry logic**: Built-in exponential backoff and retry handling per provider
 - **Separation of concerns**: Scoring focuses on evaluation, reporting handles summarization
-- **Extensibility**: Easy to add new providers, scorers, or reporting modules
+- **Extensibility**: Easy to add new providers via LiteLLM, scorers, or reporting modules
 
 ## Usage Examples
 
@@ -98,7 +98,7 @@ poetry run python scripts/run_benchmark.py \
 poetry run python scripts/run_benchmark.py --dry-run --limit 3
 
 # 4. Single model
-poetry run python scripts/run_benchmark.py --model openai/gpt-oss-20b:free
+poetry run python scripts/run_benchmark.py --model google/gemini-2.0-flash-exp
 
 # 5. Score results
 poetry run python scripts/eval_benchmark.py --input outputs/runs/<run_id>/run.jsonl
