@@ -6,11 +6,12 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import random
 import re
 import sys
 import time
 from pathlib import Path
-from typing import Awaitable, Callable, TypedDict
+from typing import Awaitable, Callable, NamedTuple, TypedDict
 
 try:
     from dotenv import load_dotenv
@@ -34,13 +35,15 @@ from src.benchmark.providers.litellm_provider import LiteLLMProvider, _has_api_k
 from src.labeling_app.core.models import Dataset
 from src.labeling_app.db.libsql import create_client
 from src.labeling_app.db.queries import (
-    count_reviewer_completed,
+    get_llm_reviewer_counts,
+    get_llm_unlabeled_counts,
     get_unlabeled_responses,
     insert_review,
 )
 from src.labeling_app.llm.llm_scorer import score_response_async
 
-logger = setup_logger("ai-label")
+logger = setup_logger("labeler")
+plan_logger = setup_logger("planer")
 
 
 class LabelingStats(TypedDict):
@@ -115,6 +118,199 @@ def resolve_models(
         sys.exit(1)
 
 
+
+
+class _RetryDecision(NamedTuple):
+    """Represents how the caller should respond to a failed scoring request."""
+
+    should_retry: bool
+    wait_seconds: float
+    label: str
+    summary: str
+
+
+_RETRYABLE_STATUS_CODES = {408, 409, 425, 429, 500, 502, 503, 504}
+_BASE_WAIT_SECONDS = 1.5
+_MAX_WAIT_SECONDS = 65.0
+
+
+def _seconds_until_next_minute(now: float | None = None) -> float:
+    """Return the seconds until the next minute boundary (minimum of one second)."""
+
+    current = now or time.time()
+    remainder = current % 60.0
+    wait = 60.0 - remainder if remainder else 60.0
+    return max(1.0, wait)
+
+
+def _retry_hint_seconds(exc: Exception) -> float | None:
+    """Extract an explicit retry-after hint from headers or error payload."""
+
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None)
+    candidates: list[str] = []
+
+    if headers:
+        try:
+            for key in headers.keys():  # type: ignore[attr-defined]
+                value = headers.get(key)
+                if not value:
+                    continue
+                lower = key.lower()
+                if lower in {
+                    "retry-after", 
+                    "x-ratelimit-reset", 
+                    "x-ratelimit-reset-requests", 
+                    "x-ratelimit-reset-tokens",
+                    # Cerebras-specific headers
+                    "x-ratelimit-reset-requests-day",
+                    "x-ratelimit-reset-tokens-minute",
+                }:
+                    candidates.append(str(value))
+        except Exception:
+            pass
+
+    for attr in ("retry_after", "retry_after_ms"):
+        value = getattr(exc, attr, None)
+        if value:
+            candidates.append(str(value))
+
+    message = str(exc)
+    match = re.search(r"retry in\s+([\d.]+)s", message, re.IGNORECASE)
+    if match:
+        candidates.append(match.group(1))
+    delay_match = re.search(r'"retryDelay"\s*:\s*"(\d+)s"', message)
+    if delay_match:
+        candidates.append(delay_match.group(1))
+
+    for raw in candidates:
+        raw = raw.strip().lower()
+        if not raw:
+            continue
+        try:
+            value = float(raw)
+        except ValueError:
+            minutes_match = re.fullmatch(r"(?:(?P<m>\d+(?:\.\d+)?)m)?(?:(?P<s>\d+(?:\.\d+)?)s)?", raw)
+            if minutes_match:
+                minutes = float(minutes_match.group("m") or 0)
+                seconds = float(minutes_match.group("s") or 0)
+                value = minutes * 60 + seconds
+            else:
+                try:
+                    from email.utils import parsedate_to_datetime
+
+                    dt = parsedate_to_datetime(raw)
+                    if dt is None:
+                        continue
+                    value = max(0.0, dt.timestamp() - time.time())
+                except Exception:
+                    continue
+        if value > 1e8:  # treat as timestamp
+            if value > 1e12:
+                value /= 1000.0
+            value = max(0.0, value - time.time())
+        if value >= 0:
+            return value
+    return None
+
+
+def _status_code_from_exception(exc: Exception) -> int | None:
+    """Best-effort retrieval of an HTTP status code from LiteLLM exceptions."""
+
+    status_code = getattr(exc, "status_code", None)
+    if isinstance(status_code, int):
+        return status_code
+    response = getattr(exc, "response", None)
+    response_code = getattr(response, "status_code", None)
+    return int(response_code) if isinstance(response_code, int) else None
+
+
+def _is_daily_quota_error(exc: Exception) -> bool:
+    """Return True when the error clearly signals a daily quota exhaustion."""
+
+    message = str(exc).lower()
+    quota_tokens = ("requests per day", "per-day quota", "quotaid", "daily quota", "rpd")
+    return any(token in message for token in quota_tokens)
+
+
+def _classify_exception(exc: Exception) -> tuple[str | None, str]:
+    """Determine the retry label for an exception and capture a short summary."""
+
+    import litellm
+
+    status_code = _status_code_from_exception(exc)
+    summary = str(exc).split("\n", 1)[0] if exc else ""
+
+    if _is_daily_quota_error(exc):
+        return "quota", summary or "daily quota"
+
+    if isinstance(exc, litellm.exceptions.RateLimitError) or status_code == 429:
+        return "limited", summary or "rate limit"
+
+    if isinstance(exc, litellm.exceptions.BadRequestError):
+        return "limited", summary or "bad request"
+
+    transient_types = (
+        litellm.exceptions.APIConnectionError,
+        litellm.exceptions.ServiceUnavailableError,
+        litellm.exceptions.Timeout,
+    )
+    if isinstance(exc, transient_types):
+        return "retry", summary or type(exc).__name__
+
+    if status_code is not None:
+        try:
+            if litellm._should_retry(status_code):
+                return "retry", summary or f"http {status_code}"
+        except Exception:
+            if status_code in _RETRYABLE_STATUS_CODES:
+                return "retry", summary or f"http {status_code}"
+
+    lowered = summary.lower()
+    for token in ("temporary", "try again", "timeout", "connection reset", "overloaded"):
+        if token in lowered:
+            return "retry", summary or token
+
+    return None, summary or type(exc).__name__
+
+
+def _build_retry_decision(exc: Exception, attempt: int) -> _RetryDecision:
+    """Create a retry decision for the given exception and attempt index (1-indexed)."""
+
+    label, summary = _classify_exception(exc)
+    if label == "quota":
+        return _RetryDecision(False, 0.0, label, summary)
+    if label is None:
+        return _RetryDecision(False, 0.0, "nonretry", summary)
+
+    wait_seconds = _retry_hint_seconds(exc)
+    if wait_seconds is None:
+        if label == "limited":
+            wait_seconds = max(5.0, _seconds_until_next_minute() + 1.0)
+        else:
+            wait_seconds = _BASE_WAIT_SECONDS * (2 ** (attempt - 1))
+    wait_seconds = min(_MAX_WAIT_SECONDS, wait_seconds)
+    wait_seconds = max(1.0, wait_seconds + random.uniform(0.25, 0.75))
+
+    return _RetryDecision(True, wait_seconds, label, summary)
+
+
+
+RATE_LIMIT_GUARD: dict[str, float] = {}
+RATE_LIMIT_LOCK = asyncio.Lock()
+
+
+async def _respect_rate_limit_window(provider_name: str | None) -> None:
+    if not provider_name:
+        return
+    while True:
+        async with RATE_LIMIT_LOCK:
+            available = RATE_LIMIT_GUARD.get(provider_name, 0.0)
+        delay = available - time.time()
+        if delay <= 0:
+            return
+        await asyncio.sleep(delay)
+
 async def score_with_retry(
     client: LiteLLMProvider,
     response: dict,
@@ -123,52 +319,12 @@ async def score_with_retry(
     max_attempts: int,
     task_num: int,
 ) -> tuple[float | None, bool, float]:
-    """Score a single response with retry-after header-based retry handling.
-    
-    Handles retries by extracting retry-after delays from HTTP response headers
-    (much more effective than exponential backoff). LiteLLM's automatic retries
-    are disabled (max_retries=0) so we have full control over retry timing.
-    
-    Args:
-        client: LiteLLM provider instance (configured with max_retries=0)
-        response: Response dictionary to score
-        model_id: Model identifier
-        get_progress: Callable that returns current progress string
-        max_attempts: Maximum retry attempts
-        task_num: Sequential task number (1, 2, 3...)
-    """
-    import litellm
-    
-    def parse_groq_time_format(time_str: str) -> float | None:
-        """Parse Groq's time format (e.g., '2m59.56s', '7.66s') to seconds.
-        
-        Examples:
-            '2m59.56s' -> 179.56 seconds
-            '7.66s' -> 7.66 seconds
-            '1m' -> 60 seconds
-        """
+    """Score a single response with bounded retries tuned for RPM rate limits."""
+    provider_name = client.get_provider_for_model(model_id)
+
+    for attempt in range(1, max_attempts + 1):
         try:
-            time_str = time_str.strip().lower()
-            total_seconds = 0.0
-            
-            # Parse minutes (e.g., '2m' or '2m59.56s')
-            if 'm' in time_str:
-                minutes_match = re.search(r'(\d+(?:\.\d+)?)m', time_str)
-                if minutes_match:
-                    total_seconds += float(minutes_match.group(1)) * 60
-            
-            # Parse seconds (e.g., '7.66s' or '59.56s')
-            if 's' in time_str:
-                seconds_match = re.search(r'(\d+(?:\.\d+)?)s', time_str)
-                if seconds_match:
-                    total_seconds += float(seconds_match.group(1))
-            
-            return total_seconds if total_seconds > 0 else None
-        except (ValueError, AttributeError, TypeError):
-            return None
-    
-    for attempt in range(max_attempts):
-        try:
+            await _respect_rate_limit_window(provider_name)
             score, metadata = await score_response_async(
                 prompt_title=response["prompt_title"],
                 prompt_body=response["prompt_body"],
@@ -181,368 +337,54 @@ async def score_with_retry(
             )
             cost = metadata.cost_usd or 0.0
             return score, True, cost
-        except Exception as e:
-            error_msg = str(e)
-            
-            # Check if it's a rate limit error - check multiple sources
-            is_rate_limit = isinstance(e, litellm.exceptions.RateLimitError)
-            
-            # Also check for BadRequestError with 429 status code (Gemini uses this)
-            if not is_rate_limit and isinstance(e, litellm.exceptions.BadRequestError):
-                if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
-                    is_rate_limit = True
-            
-            # Also check for APIError with 429 status code
-            if not is_rate_limit and isinstance(e, litellm.exceptions.APIError):
-                status_code = getattr(e, "status_code", None)
-                if status_code == 429:
-                    is_rate_limit = True
-            
-            # Also check APIConnectionError - sometimes rate limits come as connection errors
-            # (e.g., Cohere trial key rate limits)
-            if not is_rate_limit and isinstance(e, litellm.exceptions.APIConnectionError):
-                # Check if the error message indicates a rate limit
-                if ("limited to" in error_msg.lower() 
-                    or "rate limit" in error_msg.lower()
-                    or "api calls / minute" in error_msg.lower()
-                    or "requests per minute" in error_msg.lower()):
-                    is_rate_limit = True
-            
-            # Fallback to string-based detection if exception type doesn't match
-            if not is_rate_limit:
-                is_rate_limit = (
-                    "RateLimitError" in error_msg
-                    or "rate limit" in error_msg.lower()
-                    or "429" in error_msg
-                    or "RESOURCE_EXHAUSTED" in error_msg
-                    or "limited to" in error_msg.lower()  # Cohere trial key messages
-                    or "requests per minute" in error_msg.lower()
-                    or "api calls / minute" in error_msg.lower()
-                    or "quota exceeded" in error_msg.lower()
-                    or "too many requests" in error_msg.lower()
-                )
-            
-            # Extract retry-after delay from response headers if available
-            default_wait_time = 2.0 * (attempt + 1)  # Default exponential backoff
-            wait_time = default_wait_time
-            found_retry_time = False  # Track if we successfully extracted retry time from response
-            
-            # Check if error message contains retry instructions first (e.g., Gemini's "Please retry in X.XXXs")
-            # This takes precedence over daily quota detection - if API says to retry, we should retry
-            has_retry_instruction = re.search(r'Please retry in ([\d.]+)s', error_msg, re.IGNORECASE)
-            if has_retry_instruction:
-                wait_time = float(has_retry_instruction.group(1)) + 2.0  # Add 2s buffer
-                found_retry_time = True
-            
-            # Also check for retryDelay in JSON structure (Gemini's error details)
-            if not found_retry_time:
-                retry_delay_match = re.search(r'"retryDelay"\s*:\s*"(\d+)s"', error_msg, re.IGNORECASE)
-                if retry_delay_match:
-                    wait_time = float(retry_delay_match.group(1)) + 2.0  # Add 2s buffer
-                    found_retry_time = True
-            
-            # Detect if it's a daily quota limit (RPD) vs per-minute limit (RPM)
-            # Only treat as non-retryable if there's no retry instruction in the error message
-            is_daily_quota = False
-            if is_rate_limit and not found_retry_time:
-                # Check for daily quota indicators in Google's error response
-                # quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier"
-                # quotaMetric: "generativelanguage.googleapis.com/generate_content_free_tier_requests"
-                daily_indicators = [
-                    r'"quotaId"\s*:\s*"[^"]*RequestsPerDay[^"]*"',  # quotaId contains "RequestsPerDay"
-                    r'"quotaId"\s*:\s*"[^"]*PerDay[^"]*"',  # quotaId contains "PerDay"
-                    r'limit:\s*\d+\s*RPD',  # Explicit RPD mention
-                    r'Requests Per Day',  # Explicit mention
-                ]
-                for pattern in daily_indicators:
-                    if re.search(pattern, error_msg, re.IGNORECASE):
-                        is_daily_quota = True
-                        break
-            
-            # For daily quotas without retry instructions, don't retry - quota resets at midnight UTC
-            if is_daily_quota and not found_retry_time:
-                logger.warning(
-                    f"Daily quota (RPD) limit exceeded - skipping retries. "
-                    f"Quota resets at midnight UTC.",
-                    extra=make_log_extra(
-                        model=model_id,
-                        grid=str(response["id"]),
-                        task=str(task_num),
-                        progress=get_progress(),
-                        tag="warning",
-                        status="daily-quota-exceeded",
-                        details=("RPD limit hit, no retries",),
-                    ),
-                )
-                return None, False, 0.0
-            
-            if is_rate_limit:
-                # Try to extract retry time from response headers (works for RateLimitError and APIError)
-                # LiteLLM exceptions may have response in different attributes:
-                # - RateLimitError.response (httpx.Response)
-                # - APIError.response (httpx.Response)
-                # - APIConnectionError might not have response directly
-                
-                # Try multiple ways to access the response
-                # LiteLLM exceptions may wrap httpx exceptions or have response in different places
-                http_response = None
-                for attr_name in ["response", "http_response", "resp", "litellm_response", "_response"]:
-                    http_response = getattr(e, attr_name, None)
-                    if http_response:
-                        break
-                
-                # If no direct response, check wrapped exceptions
-                if not http_response:
-                    for attr_name in ["exception", "original_exception", "cause", "__cause__"]:
-                        underlying = getattr(e, attr_name, None)
-                        if underlying:
-                            http_response = getattr(underlying, "response", None)
-                            if http_response:
-                                break
-                
-                # Try to get response from exception's __dict__ if available
-                if not http_response and hasattr(e, "__dict__"):
-                    for key, value in e.__dict__.items():
-                        if "response" in key.lower() and value and hasattr(value, "headers"):
-                            http_response = value
-                            break
-                
-                # Extract headers from response using httpx's built-in methods
-                # httpx.Response.headers is a case-insensitive Headers object
-                headers = None
-                if http_response:
-                    if hasattr(http_response, "headers"):
-                        headers = http_response.headers
-                    elif hasattr(http_response, "get"):
-                        # Might be a dict-like object
-                        headers = http_response.get("headers") or http_response.get("Headers")
-                        if headers and not hasattr(headers, "get"):
-                            # Convert dict to something we can use
-                            try:
-                                import httpx
-                                headers = httpx.Headers(headers)
-                            except:
-                                pass
-                
-                # Extract retry-after from headers using httpx's case-insensitive access
-                if headers:
-                    # httpx.Headers.get() is case-insensitive, so we can use lowercase
-                    # Check standard retry-after header first
-                    retry_after = headers.get("retry-after")
-                    if retry_after:
-                        try:
-                            wait_time = float(retry_after) + 2.0  # Add 2s buffer
-                            found_retry_time = True
-                        except (ValueError, TypeError):
-                            pass
-                    
-                    # Try X-RateLimit-Reset headers if retry-after not found
-                    # Groq uses x-ratelimit-reset-requests and x-ratelimit-reset-tokens with time format (e.g., "2m59.56s")
-                    # Other providers may use timestamp format
-                    if not found_retry_time:
-                        reset_header = (
-                            headers.get("x-ratelimit-reset-requests") 
-                            or headers.get("x-ratelimit-reset-tokens")
-                            or headers.get("x-ratelimit-reset")
-                        )
-                        if reset_header:
-                            # Try Groq's time format first (e.g., "2m59.56s", "7.66s")
-                            parsed_time = parse_groq_time_format(reset_header)
-                            if parsed_time:
-                                wait_time = parsed_time + 2.0  # Add 2s buffer
-                                found_retry_time = True
-                            else:
-                                # Fallback: Try timestamp format (numeric)
-                                try:
-                                    reset_timestamp = float(reset_header)
-                                    # Check if it's milliseconds (large number) or seconds
-                                    if reset_timestamp > 1e10:
-                                        reset_timestamp = reset_timestamp / 1000  # Convert ms to seconds
-                                    current_time = time.time()
-                                    wait_time = max(1.0, reset_timestamp - current_time + 2)
-                                    found_retry_time = True
-                                except (ValueError, TypeError):
-                                    pass
-                    
-                    # Check all headers for rate limit related keys if still not found
-                    # Some providers might use non-standard header names
-                    if not found_retry_time and hasattr(headers, "keys"):
-                        try:
-                            for header_key in headers.keys():
-                                header_lower = header_key.lower()
-                                if ("retry" in header_lower or "rate" in header_lower or "limit" in header_lower):
-                                    header_value = headers.get(header_key)
-                                    if header_value:
-                                        # Try to parse as time format or number
-                                        parsed_time = parse_groq_time_format(str(header_value))
-                                        if parsed_time:
-                                            wait_time = parsed_time + 2.0
-                                            found_retry_time = True
-                                            break
-                                        try:
-                                            wait_seconds = float(header_value)
-                                            if 0 < wait_seconds < 3600:  # Reasonable wait time (0-1 hour)
-                                                wait_time = wait_seconds + 2.0
-                                                found_retry_time = True
-                                                break
-                                        except (ValueError, TypeError):
-                                            continue
-                        except Exception:
-                            pass
-                
-                # Parse error message for retryDelay if headers didn't provide it
-                # Note: We already checked for "Please retry in" and "retryDelay" earlier,
-                # so this is only a fallback if headers weren't found
-                if not found_retry_time:
-                    # Pattern 1: "Please retry in X.XXXs" from Gemini error message (most precise)
-                    # This is a fallback - we already checked this earlier but it's here for completeness
-                    retry_msg_match = re.search(r'Please retry in ([\d.]+)s', error_msg, re.IGNORECASE)
-                    if retry_msg_match:
-                        wait_time = float(retry_msg_match.group(1)) + 2.0  # Add 2s buffer
-                        found_retry_time = True
-                    else:
-                        # Pattern 2: "retryDelay": "8s" from JSON (fallback if message not found)
-                        retry_delay_match = re.search(r'"retryDelay"\s*:\s*"(\d+)s"', error_msg, re.IGNORECASE)
-                        if retry_delay_match:
-                            wait_time = float(retry_delay_match.group(1)) + 2.0  # Add 2s buffer
-                            found_retry_time = True
-                
-                # Pattern 3: Cohere trial key - "limited to X API calls / minute"
-                # Check this separately (not nested in else) to catch per-minute limits
-                # For per-minute limits, wait until next minute (60s)
-                if not found_retry_time and is_rate_limit:
-                    if ("per minute" in error_msg.lower() 
-                        or "requests per minute" in error_msg.lower()
-                        or "api calls / minute" in error_msg.lower()
-                        or "api calls/minute" in error_msg.lower()
-                        or "calls / minute" in error_msg.lower()
-                        or "calls/minute" in error_msg.lower()):
-                        wait_time = 60.0  # Wait until next minute window
-                        found_retry_time = True
-                
-                # If still no retry time found, fall back to exponential backoff
-                # Log debug info to help diagnose why headers weren't found
-                if not found_retry_time:
-                    # Debug: log exception structure and what headers we found
-                    debug_info = []
-                    debug_info.append(f"exception={type(e).__name__}")
-                    debug_info.append(f"has_response={hasattr(e, 'response')}")
-                    
-                    if http_response:
-                        debug_info.append(f"http_response_type={type(http_response).__name__}")
-                        if hasattr(http_response, "headers"):
-                            debug_info.append(f"has_headers=True")
-                            # Try to show what headers are available
-                            try:
-                                if hasattr(http_response.headers, "keys"):
-                                    header_keys = list(http_response.headers.keys())[:5]  # First 5 headers
-                                    debug_info.append(f"header_keys={header_keys}")
-                            except:
-                                pass
-                        else:
-                            debug_info.append(f"has_headers=False")
-                    else:
-                        debug_info.append(f"http_response=None")
-                    
-                    logger.debug(
-                        f"Rate limit - no retry-after header found. {' | '.join(debug_info)}",
-                        extra=make_log_extra(
-                            model=model_id,
-                            grid=str(response["id"]),
-                            task=str(task_num),
-                            progress=get_progress(),
-                            tag="debug",
-                            status="rate-limit-no-header",
-                            details=tuple(debug_info),
-                        ),
-                    )
-                    # Exponential backoff for RPM limits: 30s, 60s, 60s, 120s
-                    # Most providers are RPM-limited, so longer waits are needed
-                    if attempt == 0:
-                        wait_time = 30.0  # 30s for first retry
-                    elif attempt == 1:
-                        wait_time = 60.0  # 1m for second retry
-                    elif attempt == 2:
-                        wait_time = 60.0  # 1m for third retry
-                    else:
-                        wait_time = 120.0  # 2m for subsequent retries
-            
-            if attempt < max_attempts - 1:
-                current_progress = get_progress()
-                if is_rate_limit:
-                    # Only log at warning level if:
-                    # 1. We couldn't extract retry time from response (found_retry_time = False)
-                    #    (uses exponential backoff: 30s, 60s, 60s, 120s)
-                    # 2. OR wait time is very long (>120s) - indicates potential issue
-                    # Otherwise use debug level for successful retry time extraction from headers
-                    if not found_retry_time or wait_time > 120.0:
-                        logger.warning(
-                            f"Rate limit - retry {attempt+1}/{max_attempts} in {wait_time:.0f}s",
-                            extra=make_log_extra(
-                                model=model_id,
-                                grid=str(response["id"]),
-                                task=str(task_num),
-                                progress=current_progress,
-                                tag="warning",
-                                status="rate-limit-retry",
-                                details=(f"wait_time={wait_time:.1f}s",),
-                            ),
-                        )
-                    else:
-                        # Successfully extracted retry time - log at debug level
-                        logger.debug(
-                            f"Rate limit - retry {attempt+1}/{max_attempts} in {wait_time:.0f}s",
-                            extra=make_log_extra(
-                                model=model_id,
-                                grid=str(response["id"]),
-                                task=str(task_num),
-                                progress=current_progress,
-                                tag="debug",
-                                status="rate-limit-retry",
-                                details=(f"wait_time={wait_time:.1f}s",),
-                            ),
-                        )
-                else:
-                    # Non-rate-limit errors - log as warning
-                    logger.warning(
-                        f"Error - retry {attempt+1}/{max_attempts} in {wait_time:.0f}s",
-                        extra=make_log_extra(
-                            model=model_id,
-                            grid=str(response["id"]),
-                            task=str(task_num),
-                            progress=current_progress,
-                            tag="warning",
-                            status="retry",
-                            details=(f"error={error_msg[:80]}", f"wait_time={wait_time:.1f}s"),
-                        ),
-                    )
-                await asyncio.sleep(wait_time)
-            else:
-                # Create concise error message for rate limits
-                if is_rate_limit:
-                    # Extract key info: quota limit and retry delay if available
-                    quota_match = re.search(r'limit:\s*(\d+)', error_msg, re.IGNORECASE)
-                    retry_match = re.search(r'Please retry in ([\d.]+)s', error_msg, re.IGNORECASE)
-                    quota_info = f" (quota: {quota_match.group(1)})" if quota_match else ""
-                    retry_info = f" - retry in {retry_match.group(1)}s" if retry_match else ""
-                    concise_msg = f"Rate limit exceeded{quota_info}{retry_info}"
-                else:
-                    concise_msg = error_msg[:100]
-                
-                error_type = "Rate limit" if is_rate_limit else "Error"
+        except Exception as exc:
+            decision = _build_retry_decision(exc, attempt)
+            progress = get_progress()
+            status_code = _status_code_from_exception(exc)
+            details = [f"attempt={attempt}/{max_attempts}"]
+            if status_code is not None:
+                details.append(f"status={status_code}")
+            details.append(f"error={type(exc).__name__}")
+
+            if attempt >= max_attempts or not decision.should_retry:
                 logger.error(
-                    f"{error_type} after {max_attempts} attempts: {concise_msg}",
+                    "Scoring failed",
                     extra=make_log_extra(
                         model=model_id,
                         grid=str(response["id"]),
                         task=str(task_num),
-                        progress=get_progress(),
+                        progress=progress,
                         tag="error",
-                        status="final-failure",
-                        details=(f"error={concise_msg}",),
+                        status="giveup" if decision.should_retry else decision.label,
+                        details=tuple(details),
                     ),
                 )
+                logger.debug("Scoring exception details", exc_info=exc)
                 return None, False, 0.0
+
+            wait_seconds = decision.wait_seconds
+            if wait_seconds:
+                if provider_name:
+                    async with RATE_LIMIT_LOCK:
+                        current = RATE_LIMIT_GUARD.get(provider_name, 0.0)
+                        target = max(time.time() + wait_seconds, current)
+                        RATE_LIMIT_GUARD[provider_name] = target
+                details.append(f"wait={wait_seconds:.0f}s")
+            logger.warning(
+                "Retrying scorer",
+                extra=make_log_extra(
+                    model=model_id,
+                    grid=str(response["id"]),
+                    task=str(task_num),
+                    progress=progress,
+                    tag="retry",
+                    status=decision.label,
+                    details=tuple(details),
+                ),
+            )
+            if wait_seconds:
+                await asyncio.sleep(wait_seconds)
+    return None, False, 0.0
 
 
 async def run_labeling_for_model(
@@ -558,18 +400,6 @@ async def run_labeling_for_model(
     get_global_task: Callable[[], Awaitable[int]] | None = None,
 ) -> LabelingStats:
     """Run labeling for a single model."""
-    logger.info(
-        "Starting labeling",
-        extra=make_log_extra(
-            model=model_id,
-            grid=None,
-            task=None,
-            progress=None,
-            tag="info",
-            status="start",
-            details=(f"model={model_id}",),
-        ),
-    )
     
     # Setup LiteLLM provider with model configs
     client = LiteLLMProvider(provider_config, run_config, model_configs)
@@ -583,37 +413,10 @@ async def run_labeling_for_model(
         unlabeled = get_unlabeled_responses(db_client, dataset, reviewer_code, limit)
         
         if not unlabeled:
-            logger.info(
-                "No unlabeled responses found",
-                extra=make_log_extra(
-                    model=model_id,
-                    grid=None,
-                    task=None,
-                    progress=None,
-                    tag="info",
-                    status="no-data",
-                    details=(f"reviewer_code={reviewer_code}",),
-                ),
-            )
             return {"successful": 0, "failed": 0, "skipped": 0, "cost": 0.0}
         
-        logger.info(
-            f"Found {len(unlabeled)} unlabeled responses",
-            extra=make_log_extra(
-                model=model_id,
-                grid=None,
-                task=None,
-                progress=None,
-                tag="info",
-                status="found-responses",
-                details=(f"count={len(unlabeled)}", f"reviewer_code={reviewer_code}"),
-            ),
-        )
         if len(unlabeled) <= 10:
-            logger.debug(f"Response IDs: {[r['id'] for r in unlabeled]}")
-        
-        # Get initial review count from DB for this model
-        initial_review_count = count_reviewer_completed(db_client, dataset, reviewer_code)
+            logger.debug(f"Model {model_id} pending response IDs: {[r['id'] for r in unlabeled]}")
         
         # Process responses with concurrency control
         semaphore = asyncio.Semaphore(concurrency)
@@ -650,7 +453,7 @@ async def run_labeling_for_model(
                             task=str(task_num),
                             progress=get_current_progress(),
                             tag="info",
-                            status="dry-run",
+                            status="dryrun",
                             details=(f"response_id={response['id']}",),
                         ),
                     )
@@ -706,7 +509,7 @@ async def run_labeling_for_model(
                                 task=str(task_num),
                                 progress=current_progress,
                                 tag="error",
-                                status="insert-failed",
+                                status="db-fail",
                                 details=(f"error={str(e)}", f"response_id={response['id']}"),
                             ),
                         )
@@ -720,23 +523,7 @@ async def run_labeling_for_model(
         tasks = [process_response(response, idx) for idx, response in enumerate(unlabeled)]
         await asyncio.gather(*tasks)
         
-        logger.info(
-            f"Model completed: {successful} successful, {failed} failed, {skipped} skipped",
-            extra=make_log_extra(
-                model=model_id,
-                grid=None,
-                task=None,
-                progress=None,
-                tag="info",
-                status="model-completed",
-                details=(
-                    f"successful={successful}",
-                    f"failed={failed}",
-                    f"skipped={skipped}",
-                    f"cost=${total_cost:.4f}",
-                ),
-            ),
-        )
+        # Return stats - logging will be done by the caller (process_model wrapper)
         return {"successful": successful, "failed": failed, "skipped": skipped, "cost": total_cost}
         
     finally:
@@ -787,30 +574,123 @@ async def main() -> None:
     
     # Resolve models to run
     all_models, model_configs = resolve_models(args, provider_config)
-    
+
+    dataset = Dataset(args.dataset)
+
+    # Prefetch reviewer stats in a single DB round-trip
+    db_client = create_client()
+    try:
+        reviewer_counts = get_llm_reviewer_counts(db_client, dataset)
+        reviewer_targets = [f"llm:{model_id}" for model_id in all_models]
+        unlabeled_counts = get_llm_unlabeled_counts(db_client, dataset, reviewer_targets)
+    finally:
+        db_client.close()
+
     # Filter models based on API key availability
-    models = []
-    skipped_models = []
+    models: list[str] = []
+    skipped_models: list[str] = []
     for model_id in all_models:
         if _has_api_key_for_model(provider_config, model_id):
             models.append(model_id)
         else:
             skipped_models.append(model_id)
-    
-    # Log which models will be processed
-    logger.info("")
-    logger.info(f"📋 Found {len(all_models)} model(s) in config")
+
+    plan_entries: list[dict[str, object]] = []
+    models_to_process: list[str] = []
+    if models:
+        for idx, model_id in enumerate(models, 1):
+            reviewer_code = f"llm:{model_id}"
+            pending = unlabeled_counts.get(reviewer_code, 0)
+            completed = reviewer_counts.get(reviewer_code, 0)
+            todo = "OPEN" if pending > 0 else "DONE"
+            plan_entries.append(
+                {
+                    "idx": idx,
+                    "model": model_id,
+                    "pending": pending,
+                    "completed": completed,
+                    "todo": todo,
+                }
+            )
+            if todo == "OPEN":
+                models_to_process.append(model_id)
+
     if skipped_models:
-        logger.warning(f"⚠️  {len(skipped_models)} model(s) skipped - no API key:")
-        for model_id in skipped_models:
-            logger.warning(f"   - {model_id}")
-    logger.info(f"✅ {len(models)} model(s) will be processed:")
-    for idx, model_id in enumerate(models, 1):
-        logger.info(f"   {idx:2d}. {model_id}")
-    logger.info("")
+        plan_logger.warning(
+            "",
+            extra=make_log_extra(
+                model=None,
+                grid=None,
+                task=None,
+                progress=None,
+                tag="warn",
+                status="no-key",
+                details=(f"count={len(skipped_models)}", ", ".join(skipped_models)),
+            ),
+        )
+    if plan_entries:
+        plan_logger.info(
+            "",
+            extra=make_log_extra(
+                model=None,
+                grid=None,
+                task=None,
+                progress=None,
+                tag="info",
+                status="plan",
+                details=(
+                    f"total={len(plan_entries)}",
+                    f"open={len(models_to_process)}",
+                    f"done={len(plan_entries) - len(models_to_process)}",
+                ),
+            ),
+        )
+        for entry in plan_entries:
+            plan_logger.info(
+                "",
+                extra=make_log_extra(
+                    model=str(entry["model"]),
+                    grid=None,
+                    task=None,
+                    progress=None,
+                    tag="info",
+                    status=str(entry["todo"]),
+                    details=(
+                        f"idx={entry['idx']}",
+                        f"todo={entry['todo']}",
+                        f"pending={entry['pending']}",
+                        f"completed={entry['completed']}",
+                    ),
+                ),
+            )
+    else:
+        plan_logger.info(
+            "",
+            extra=make_log_extra(
+                model=None,
+                grid=None,
+                task=None,
+                progress=None,
+                tag="info",
+                status="plan",
+                details=("no-models",),
+            ),
+        )
     
-    # Convert dataset string to enum
-    dataset = Dataset(args.dataset)
+    if not models_to_process:
+        logger.info(
+            "No pending responses to label",
+            extra=make_log_extra(
+                model=None,
+                grid=None,
+                task=None,
+                progress=None,
+                tag="info",
+                status="plan",
+                details=("all-complete",),
+            ),
+        )
+        return
     
     # Run labeling for all models in parallel
     total_stats = {"successful": 0, "failed": 0, "skipped": 0, "cost": 0.0}
@@ -828,19 +708,6 @@ async def main() -> None:
     
     async def process_model(model_id: str) -> LabelingStats:
         """Process a single model and return its stats."""
-        logger.info(
-            "Processing model",
-            extra=make_log_extra(
-                model=model_id,
-                grid=None,
-                task=None,
-                progress=None,
-                tag="info",
-                status="processing",
-                details=(f"model={model_id}",),
-            ),
-        )
-        
         stats = await run_labeling_for_model(
             model_id=model_id,
             dataset=dataset,
@@ -864,11 +731,12 @@ async def main() -> None:
                 task=None,
                 progress=None,
                 tag="info",
-                status="model-summary",
+                status="done",
                 details=(
                     f"successful={stats['successful']}",
                     f"failed={stats['failed']}",
                     f"skipped={stats['skipped']}",
+                    f"cost=${stats['cost']:.4f}",
                 ),
             ),
         )
@@ -876,7 +744,7 @@ async def main() -> None:
         return stats
     
     # Process all models in parallel
-    all_stats = await asyncio.gather(*[process_model(model_id) for model_id in models])
+    all_stats = await asyncio.gather(*[process_model(model_id) for model_id in models_to_process])
     
     # Accumulate stats from all models
     for stats in all_stats:

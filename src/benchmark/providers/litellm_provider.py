@@ -25,24 +25,8 @@ configure_litellm_logging()
 litellm.drop_params = True  # Drop unsupported parameters
 litellm.suppress_debug_info = True  # Reduce verbosity
 
-MODEL_SHORT_WIDTH = 20
-TAG_WIDTH = 9
-SEP = " | "
 # Default temperature for chat completions
 DEFAULT_TEMPERATURE = 0.2
-
-
-def _short_model_id(model_id: str) -> str:
-    """Extract short model ID for display."""
-    base = model_id.split("/", 1)[-1]
-    return base.split(":", 1)[0]
-
-
-TAG_LABEL_MAP = {
-    "rate-limit": "limited",
-    "provider-error": "error",
-    "debug": "debug",
-}
 
 # Provider name mapping for display normalization
 PROVIDER_EXTRACTION_MAP: dict[str, str] = {
@@ -54,6 +38,18 @@ PROVIDER_EXTRACTION_MAP: dict[str, str] = {
     "mistral": "mistral",
     "cohere": "cohere",
 }
+
+PROVIDER_ATTR_MAP: dict[str, str] = {
+    "google_ai_studio": "google_ai_api_key",
+    "groq": "groq_api_key",
+    "huggingface": "huggingface_api_key",
+    "cerebras": "cerebras_api_key",
+    "mistral": "mistral_api_key",
+    "cohere": "cohere_api_key",
+    "openrouter": "openrouter_api_key",
+}
+
+UNSUPPORTED_REQUEST_FIELDS = {"label", "provider", "concurrency"}
 
 # Groq model mappings
 GROQ_MODEL_MAP: dict[str, str] = {
@@ -91,14 +87,46 @@ def _normalize_model_variant(model_id_lower: str) -> str:
     - "llama-3-1-8b" -> "llama-3.1-8b"
     - "qwen3-32b" -> "qwen-3-32b"
     """
-    # Normalize dash-separated version numbers (3-3 -> 3.3, 3-1 -> 3.1)
-    import re
-
     # Replace patterns like "llama-3-3" or "llama-3-1" with "llama-3.3" or "llama-3.1"
     normalized = re.sub(r"llama-3-([38])-", r"llama-3.\1-", model_id_lower)
     # Replace "qwen3-" with "qwen-3-"
     normalized = re.sub(r"qwen3-", r"qwen-3-", normalized)
     return normalized
+
+
+def _status_code_from_exception(exc: Exception) -> int | None:
+    """Best effort extraction of an HTTP status code."""
+
+    status_code = getattr(exc, "status_code", None)
+    if isinstance(status_code, int):
+        return status_code
+    response = getattr(exc, "response", None)
+    response_code = getattr(response, "status_code", None)
+    return int(response_code) if isinstance(response_code, int) else None
+
+
+def _classify_provider_exception(exc: Exception) -> tuple[str, str]:
+    """Classify provider exceptions for logging purposes."""
+
+    import litellm
+
+    message = str(exc).split("\n", 1)[0]
+    status_code = _status_code_from_exception(exc)
+
+    if isinstance(exc, litellm.exceptions.RateLimitError) or status_code == 429:
+        return "limited", message or "rate limit"
+
+    if isinstance(exc, litellm.exceptions.BadRequestError):
+        return "limited", message or "bad request"
+
+    lowered = message.lower()
+    if any(token in lowered for token in ("rate limit", "quota exceeded", "too many requests")):
+        return "limited", message or "rate limit"
+
+    if "bad request" in lowered:
+        return "limited", message or "bad request"
+
+    return "provider-error", message or type(exc).__name__
 
 
 def _extract_choice_text(choice: Any) -> tuple[str, str | None]:
@@ -154,11 +182,6 @@ def _serialize_raw_response(response: LiteLLMResponse) -> dict | None:
     except Exception:
         pass
     return None
-
-
-def _tag(label: str) -> str:
-    display = TAG_LABEL_MAP.get(label, label)
-    return f"[{display}]".ljust(TAG_WIDTH)
 
 
 def _map_model_id_to_litellm(model_id: str) -> str:
@@ -225,9 +248,15 @@ def _map_model_id_to_litellm(model_id: str) -> str:
         if "qwen-2.5-72b" in model_id_lower or "qwen2.5-72b" in model_id_lower:
             return "huggingface/Qwen/Qwen2.5-72B-Instruct"
 
-    # Cerebras models
-    if "cerebras" in model_id_lower and "llama-3.1-70b" in model_id_lower:
-        return "cerebras/llama-3.1-70b-instruct"
+    # Cerebras models - pass through as-is if already has cerebras/ prefix
+    # LiteLLM expects: cerebras/<model-name>
+    # Note: Cerebras model names may not have -instruct suffix
+    if model_id.startswith("cerebras/"):
+        # Extract model name after cerebras/
+        model_name = model_id.split("/", 1)[1]
+        # Pass through as-is - LiteLLM will handle the correct model name
+        # The model name format varies: some are llama-3.1-70b, some are llama3.1-8b
+        return model_id
 
     # Mistral and Cohere models - JSON already has correct LiteLLM format, pass through as-is
     if model_id.startswith("mistral/"):
@@ -262,18 +291,7 @@ def _has_api_key_for_model(provider_config: ProviderConfig, model_id: str) -> bo
     if not provider:
         return False
 
-    # Map provider names to ProviderConfig attributes
-    provider_attr_map = {
-        "google_ai_studio": "google_ai_api_key",
-        "groq": "groq_api_key",
-        "huggingface": "huggingface_api_key",
-        "cerebras": "cerebras_api_key",
-        "mistral": "mistral_api_key",
-        "cohere": "cohere_api_key",
-        "openrouter": "openrouter_api_key",
-    }
-
-    attr_name = provider_attr_map.get(provider)
+    attr_name = PROVIDER_ATTR_MAP.get(provider)
     if attr_name:
         api_key = getattr(provider_config, attr_name, None)
         return api_key is not None and api_key.strip() != ""
@@ -294,6 +312,12 @@ class LiteLLMProvider:
         self.model_configs = model_configs or {}
         self.logger = setup_logger("provider")
 
+    def get_provider_for_model(self, model_id: str) -> str | None:
+        """Return provider name for a given internal model id."""
+
+        litellm_model = _map_model_id_to_litellm(model_id)
+        return _extract_provider_from_model(litellm_model)
+
     def _get_api_key_for_model(self, litellm_model: str) -> str | None:
         """Get the appropriate API key for a given LiteLLM model ID.
 
@@ -310,21 +334,51 @@ class LiteLLMProvider:
         if not provider:
             return None
 
-        # Map provider names to ProviderConfig attributes
-        provider_attr_map = {
-            "google_ai_studio": "google_ai_api_key",
-            "groq": "groq_api_key",
-            "huggingface": "huggingface_api_key",
-            "cerebras": "cerebras_api_key",
-            "mistral": "mistral_api_key",
-            "cohere": "cohere_api_key",
-            "openrouter": "openrouter_api_key",
-        }
-
-        attr_name = provider_attr_map.get(provider)
+        attr_name = PROVIDER_ATTR_MAP.get(provider)
         if attr_name:
             return getattr(self.cfg, attr_name, None)
         return None
+
+    def _build_request_args(self, model_id: str, litellm_model: str) -> dict[str, Any]:
+        """Assemble request keyword arguments for LiteLLM completion calls.
+
+        The returned dict is a shallow copy so updates inside chat_async do not mutate
+        the original `model_configs` entry.
+        """
+        request_args = dict(self.model_configs.get(model_id, {}))
+
+        for field in UNSUPPORTED_REQUEST_FIELDS:
+            if field in request_args:
+                request_args.pop(field, None)
+
+        request_args.setdefault("model", litellm_model)
+
+        api_key = self._get_api_key_for_model(litellm_model)
+        if api_key and not request_args.get("api_key"):
+            request_args["api_key"] = api_key
+
+        if self.run_cfg.request_timeout_s and "timeout" not in request_args:
+            request_args["timeout"] = self.run_cfg.request_timeout_s
+
+        if self.run_cfg.max_retries is not None and "num_retries" not in request_args:
+            request_args["num_retries"] = self.run_cfg.max_retries
+
+        request_args.setdefault("temperature", DEFAULT_TEMPERATURE)
+        
+        # Add OpenRouter metadata for data policy (allows free models to work)
+        # OpenRouter requires users to configure privacy settings, but we can specify
+        # that we allow model publication in the request metadata
+        provider = _extract_provider_from_model(litellm_model)
+        if provider == "openrouter":
+            # Set metadata to allow free model publication
+            # This requires users to have configured their OpenRouter account
+            # at https://openrouter.ai/settings/privacy to allow "Allow model publication"
+            if "metadata" not in request_args:
+                request_args["metadata"] = {}
+            # Note: Users must still configure their OpenRouter account privacy settings
+            # This just ensures we're requesting with the right metadata structure
+        
+        return request_args
 
     def _parse_litellm_response(
         self,
@@ -450,14 +504,8 @@ class LiteLLMProvider:
         litellm_model = _map_model_id_to_litellm(model_id)
         provider_name = _extract_provider_from_model(litellm_model)
 
-        # Prepare messages for LiteLLM
-        litellm_messages = [message_dict(m) for m in messages]
-
-        # Get API key for this specific model/provider
-        api_key = self._get_api_key_for_model(litellm_model)
-
-        # Validate API key is available before making the request
-        if not api_key:
+        # Ensure required credentials are present before issuing the request
+        if not _has_api_key_for_model(self.cfg, model_id):
             provider_display = normalize_provider_name(provider_name) or provider_name or "unknown"
             error_msg = (
                 f"No API key configured for provider '{provider_display}' (model: {model_id}). "
@@ -478,82 +526,18 @@ class LiteLLMProvider:
             )
             raise RuntimeError(error_msg)
 
+        # Prepare messages for LiteLLM
+        litellm_messages = [message_dict(m) for m in messages]
+        completion_kwargs = self._build_request_args(model_id, litellm_model)
+        completion_kwargs["messages"] = litellm_messages
+
         # Call LiteLLM
         t0 = time.time()
         try:
-            # Pass API key directly to acompletion() to avoid mutating os.environ
-            # This prevents concurrency issues when multiple provider instances exist
-            completion_kwargs = {
-                "model": litellm_model,
-                "messages": litellm_messages,
-                "temperature": DEFAULT_TEMPERATURE,
-                "timeout": self.run_cfg.request_timeout_s,
-                "num_retries": self.run_cfg.max_retries,
-            }
-            if api_key:
-                completion_kwargs["api_key"] = api_key
-
             response: LiteLLMResponse = await litellm.acompletion(**completion_kwargs)
-        except (
-            litellm.exceptions.APIError,
-            litellm.exceptions.RateLimitError,
-            Exception,
-        ) as e:
-            # Catch specific LiteLLM exceptions plus generic Exception as fallback
-            # for any unexpected errors (network issues, timeouts, etc.)
-            # Preserve the original exception to maintain access to response headers
-            # (RateLimitError has a 'response' attribute with httpx.Response containing headers)
-            error_msg = str(e)
-            
-            # For rate limit errors that we can handle, suppress verbose logging
-            # Check multiple exception types and error message patterns
-            is_rate_limit = isinstance(e, litellm.exceptions.RateLimitError)
-            can_handle_rate_limit = False
-            
-            # Also check for BadRequestError with 429 status code (Gemini uses this)
-            if not is_rate_limit and isinstance(e, litellm.exceptions.BadRequestError):
-                if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg or "quota exceeded" in error_msg.lower():
-                    is_rate_limit = True
-            
-            # Also check APIConnectionError for rate limit messages (e.g., Cohere trial keys)
-            if not is_rate_limit and isinstance(e, litellm.exceptions.APIConnectionError):
-                if ("limited to" in error_msg.lower() 
-                    or "rate limit" in error_msg.lower()
-                    or "api calls / minute" in error_msg.lower()
-                    or "requests per minute" in error_msg.lower()):
-                    is_rate_limit = True
-            
-            if is_rate_limit:
-                # Check if we can extract retry delay from headers or error message
-                http_response = getattr(e, "response", None)
-                if http_response and hasattr(http_response, "headers"):
-                    headers = http_response.headers
-                    can_handle_rate_limit = bool(
-                        headers.get("retry-after")
-                        or headers.get("x-ratelimit-reset")
-                        or headers.get("x-ratelimit-reset-requests")
-                    )
-                
-                # Also check if error message contains parseable retry delay
-                if not can_handle_rate_limit:
-                    can_handle_rate_limit = bool(
-                        re.search(r'Please retry in ([\d.]+)s', error_msg, re.IGNORECASE)
-                        or re.search(r'"retryDelay"\s*:\s*"(\d+)s"', error_msg, re.IGNORECASE)
-                        or "per minute" in error_msg.lower()
-                        or "api calls / minute" in error_msg.lower()
-                        or "requests per minute" in error_msg.lower()
-                    )
-            
-            if is_rate_limit and can_handle_rate_limit:
-                # Don't log here - ai_label.py handles rate limit logging with retry details
-                # This prevents duplicate logs
-                pass
-            elif is_rate_limit:
-                # Rate limit but can't handle - still suppress verbose logging
-                # ai_label.py will handle the final error logging
-                pass
-            else:
-                # Log full error for unhandled errors or non-rate-limit errors
+        except Exception as exc:
+            status, summary = _classify_provider_exception(exc)
+            if status != "limited":
                 self.logger.error(
                     "",
                     extra=make_log_extra(
@@ -562,12 +546,10 @@ class LiteLLMProvider:
                         task=task_id,
                         progress=progress,
                         tag="error",
-                        status="provider-error",
-                        details=(f"error={error_msg}",),
+                        status=status,
+                        details=(f"error={summary}",),
                     ),
                 )
-            # Re-raise the original exception to preserve response headers
-            # Callers can access e.response.headers for retry-after information
             raise
 
         dt_ms = int((time.time() - t0) * 1000)

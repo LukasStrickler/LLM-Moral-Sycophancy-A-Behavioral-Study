@@ -32,11 +32,16 @@ def configure_logging(log_file: Path | None) -> None:
 
 
 LEVEL_COL_WIDTH = 7
-LOGGER_COL_WIDTH = 6
+LOGGER_COL_WIDTH = 8
 
 DISPLAY_NAME_OVERRIDES: dict[str, str] = {
     "__main__": "main",
     "runner": "run",
+    "labeler": "Labeler",
+    "planer": "Planer",
+    "provider": "prov",
+    "LLM-Labeler": "LLMLb",
+    "labeling-config": "LblCfg",
     "provider:OO": "OpRo",
     "OO": "OpRo",
     "run": "run",
@@ -65,8 +70,7 @@ def normalize_provider_name(provider: str | None) -> str:
     return PROVIDER_NAME_MAP.get(provider_lower, provider[:10].title())
 
 
-MODEL_PREFIX_WIDTH = 20
-TAG_PREFIX_WIDTH = 9
+MODEL_PREFIX_WIDTH = 30
 PROGRESS_PREFIX_WIDTH = 7
 
 
@@ -81,8 +85,8 @@ def _format_opt(label: str, value: str | None, width: int) -> str:
 PROGRESS_COLUMN_WIDTH = PROGRESS_PREFIX_WIDTH
 
 
-TAG_COL_WIDTH = 8
-STATUS_COL_WIDTH = 12
+TAG_COL_WIDTH = 6
+STATUS_COL_WIDTH = 11
 LOG_LEVEL_MAP = {
     "DEBUG": "debug",
     "INFO": "info",
@@ -155,6 +159,64 @@ def _coerce_details(details: str | Iterable[str] | None) -> str:
     return joined.strip()
 
 
+TAG_DISPLAY_MAP: dict[str, str] = {
+    "warning": "warn",
+    "warn": "warn",
+    "retry": "retry",
+    "limited": "limit",
+    "limit": "limit",
+    "quota": "quota",
+    "error": "error",
+    "info": "info",
+    "debug": "debug",
+}
+
+STATUS_DISPLAY_MAP: dict[str, str] = {
+    "found-responses": "found",
+    "insert-failed": "db-fail",
+    "model-completed": "done",
+    "model-summary": "summary",
+    "request-done": "req-done",
+    "missing-api-key": "no-key",
+    "provider-error": "prov-err",
+    "daily-quota-exceeded": "quota",
+    "rate-limit-retry": "retry",
+    "dryrun": "dry-run",
+    "giveup": "giveup",
+    "progress": "progress",
+    "start": "start",
+    "scored": "scored",
+    "none": "no-data",
+    "limited": "limited",
+    "retry": "retry",
+    "quota": "quota",
+    "nonretry": "no-retry",
+    "plan": "plan",
+    "OPEN": "open",
+    "DONE": "done",
+}
+
+
+def _normalise_tag(level_name: str, tag_label: str | None) -> str:
+    base = tag_label or LOG_LEVEL_MAP.get(level_name, level_name.lower())
+    if not base:
+        base = level_name.lower()
+    display = TAG_DISPLAY_MAP.get(base.lower(), base.lower())
+    return display[:TAG_COL_WIDTH].ljust(TAG_COL_WIDTH)
+
+
+def _normalise_status(status_label: str | None) -> str:
+    if not status_label:
+        return "".ljust(STATUS_COL_WIDTH)
+    text = STATUS_DISPLAY_MAP.get(status_label, status_label)
+    if len(text) <= STATUS_COL_WIDTH:
+        return text.ljust(STATUS_COL_WIDTH)
+    compact = text.replace("-", "")
+    if len(compact) <= STATUS_COL_WIDTH:
+        return compact.ljust(STATUS_COL_WIDTH)
+    return text[:STATUS_COL_WIDTH].ljust(STATUS_COL_WIDTH)
+
+
 class _StructuredFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         record.message = record.getMessage()
@@ -175,12 +237,12 @@ class _StructuredFormatter(logging.Formatter):
         progress = _format_opt("P=", progress_val, PROGRESS_COLUMN_WIDTH + 2)
 
         level_name = record.levelname.upper()
-        origin = display_name
+        origin = display_name[:LOGGER_COL_WIDTH].ljust(LOGGER_COL_WIDTH)
         action_label = getattr(record, "status_label", None)
+        tag_label = getattr(record, "tag_label", None)
 
-        tag_text = f"{level_name:<{TAG_COL_WIDTH}}"[:TAG_COL_WIDTH]
-        action = action_label or LOG_LEVEL_MAP.get(level_name, level_name.lower())
-        status_text = f"{action:<{STATUS_COL_WIDTH}}"[:STATUS_COL_WIDTH]
+        tag_text = _normalise_tag(level_name, tag_label)
+        status_text = _normalise_status(action_label)
 
         details_text = _coerce_details(getattr(record, "details", record.message))
 
@@ -189,7 +251,7 @@ class _StructuredFormatter(logging.Formatter):
             f"{time_part} | {progress}" f" | {model:<{MODEL_PREFIX_WIDTH}}" f" | {grid} | {task}"
         )
 
-        middle_part = f"{tag_text} | {origin:<{LOGGER_COL_WIDTH}} | {status_text}"
+        middle_part = f"{tag_text} | {origin} | {status_text}"
 
         if details_text:
             right_part = f"[{details_text}]"
