@@ -107,10 +107,22 @@
     "concurrency": 3
   },
   {
-    "id": "cerebras/llama-3.1-70b",
-    "label": "Llama 3.1 70B (Cerebras)",
+    "id": "cerebras/llama-3.3-70b",
+    "label": "Llama 3.3 70B (Cerebras)",
     "provider": "Cerebras",
-    "concurrency": 3
+    "concurrency": 2
+  },
+  {
+    "id": "cerebras/qwen-3-235b-a22b-instruct-2507",
+    "label": "Qwen 3 235B Instruct (Cerebras)",
+    "provider": "Cerebras",
+    "concurrency": 2
+  },
+  {
+    "id": "cerebras/qwen-3-235b-a22b-thinking-2507",
+    "label": "Qwen 3 235B Thinking (Cerebras)",
+    "provider": "Cerebras",
+    "concurrency": 2
   },
   {
     "id": "mistral/mistral-small-latest",
@@ -175,6 +187,48 @@
   {
     "id": "openrouter/tngtech/deepseek-r1t2-chimera:free",
     "label": "DeepSeek R1T2 Chimera (free)",
+    "provider": "OpenRouter",
+    "concurrency": 3
+  },
+  {
+    "id": "openrouter/tngtech/deepseek-r1t-chimera:free",
+    "label": "DeepSeek R1T Chimera (free)",
+    "provider": "OpenRouter",
+    "concurrency": 3
+  },
+  {
+    "id": "openrouter/deepseek/deepseek-r1-0528:free",
+    "label": "DeepSeek R1 0528 (free)",
+    "provider": "OpenRouter",
+    "concurrency": 3
+  },
+  {
+    "id": "openrouter/deepseek/deepseek-chat-v3.1:free",
+    "label": "DeepSeek Chat v3.1 (free)",
+    "provider": "OpenRouter",
+    "concurrency": 3
+  },
+  {
+    "id": "openrouter/deepseek/deepseek-r1-distill-llama-70b:free",
+    "label": "DeepSeek R1 Distill Llama 70B (free)",
+    "provider": "OpenRouter",
+    "concurrency": 3
+  },
+  {
+    "id": "openrouter/deepseek/deepseek-r1-0528-qwen3-8b:free",
+    "label": "DeepSeek R1 0528 Qwen3 8B (free)",
+    "provider": "OpenRouter",
+    "concurrency": 3
+  },
+  {
+    "id": "openrouter/cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+    "label": "Dolphin Mistral 24B Venice (free)",
+    "provider": "OpenRouter",
+    "concurrency": 3
+  },
+  {
+    "id": "openrouter/mistralai/mistral-small-3.2-24b-instruct:free",
+    "label": "Mistral Small 3.2 24B Instruct (free)",
     "provider": "OpenRouter",
     "concurrency": 3
   }
