@@ -37,7 +37,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=9999, help="Number of prompts per model")
     parser.add_argument("--include-neutral", action="store_true", help="Include neutral prompts")
     parser.add_argument(
-        "--models", type=str, default="data/models/benchmark_models.json", help="Ordered model list JSON"
+        "--models",
+        type=str,
+        default="data/models/benchmark_models.json",
+        help="Ordered model list JSON",
     )
     parser.add_argument("--model", type=str, help="Run a single model id")
     parser.add_argument("--out", type=str, help="Custom run output path or JSONL file")
@@ -53,9 +56,12 @@ def parse_args() -> argparse.Namespace:
 
 
 def ensure_api_key(cfg) -> None:
-    if cfg.api_key:
+    if cfg.has_any_api_key():
         return
-    print("ERROR: OPENROUTER_API_KEY is not set. Add it to your environment or .env file.")
+    print("ERROR: No provider API key is set. Set at least one of:")
+    print("  GOOGLE_AI_API_KEY, GROQ_API_KEY, HUGGINGFACE_API_KEY, CEREBRAS_API_KEY,")
+    print("  MISTRAL_API_KEY, COHERE_API_KEY, or OPENROUTER_API_KEY")
+    print("Add it to your environment or .env file.")
     sys.exit(1)
 
 
@@ -163,11 +169,11 @@ def main() -> None:
     load_dotenv()
     ensure_project_on_path()
 
-    from src.benchmark.core.config import OpenRouterConfig
+    from src.benchmark.core.config import ProviderConfig
     from src.benchmark.core.logging import configure_logging, setup_logger
     from src.benchmark.run.runner_async import run_local_benchmark_async
 
-    cfg = OpenRouterConfig.from_env()
+    cfg = ProviderConfig.from_env()
     if not args.dry_run:
         ensure_api_key(cfg)
 

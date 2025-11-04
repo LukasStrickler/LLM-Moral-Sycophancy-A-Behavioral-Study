@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ..core.config import OpenRouterConfig, RunConfig
+from ..core.config import ProviderConfig, RunConfig
 from ..core.logging import (
     MODEL_PREFIX_WIDTH,
     PROGRESS_PREFIX_WIDTH,
@@ -19,7 +19,7 @@ from ..core.logging import (
 from ..core.types import Factors, ProviderMetadata, RunRecord
 from ..prompts.chat import build_chat_from_factors
 from ..prompts.generator import generate_factor_grid
-from ..providers.openrouter_client import OpenRouterClient
+from ..providers.litellm_provider import LiteLLMProvider
 
 logger = setup_logger("run")
 
@@ -132,7 +132,7 @@ class TaskSpec:
 
 async def _worker(
     sem: asyncio.Semaphore,
-    client: OpenRouterClient | None,
+    client: LiteLLMProvider | None,
     out_path: Path,
     file_lock: asyncio.Lock,
     factors: Sequence[Factors],
@@ -163,9 +163,7 @@ async def _worker(
 
         try:
             provider_metadata: ProviderMetadata | None = None
-            provider_label: str | None = (
-                getattr(client.cfg, "provider_name", None) if client is not None else None
-            )
+            provider_label: str | None = None
             latency_ms: int | None = None
             answer_text: str
             input_tokens: int | None = None
@@ -182,7 +180,7 @@ async def _worker(
                 latency_ms = 0
             else:
                 if client is None:
-                    raise RuntimeError("OpenRouter client is unavailable (dry-run disabled)")
+                    raise RuntimeError("LiteLLM provider is unavailable (dry-run disabled)")
                 # request start intentionally not logged to keep output compact
                 provider_metadata = await client.chat_async(
                     prompt.messages,
@@ -334,11 +332,11 @@ async def run_local_benchmark_async(
 ) -> Path:
     """Run the benchmark asynchronously and persist results to ``out_path``."""
 
-    cfg = OpenRouterConfig.from_env()
+    cfg = ProviderConfig.from_env()
     run_cfg = RunConfig.from_env()
-    client: OpenRouterClient | None = None
+    client: LiteLLMProvider | None = None
     if not dry_run:
-        client = OpenRouterClient(cfg, run_cfg, model_configs)
+        client = LiteLLMProvider(cfg, run_cfg, model_configs)
     run_id = int(time.time())
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -381,6 +379,13 @@ async def run_local_benchmark_async(
                     f"Current config: {model_config}. "
                     f"Please add 'concurrency' field (e.g., 'concurrency': 3)."
                 )
+        # Validate concurrency is a positive integer
+        if not isinstance(model_concurrency, int) or model_concurrency <= 0:
+            raise ValueError(
+                f"Model {model_id} concurrency must be a positive integer, "
+                f"got {model_concurrency!r}. "
+                f"Please set 'concurrency' to a positive integer (e.g., 'concurrency': 3)."
+            )
         model_semaphores[model_id] = asyncio.Semaphore(model_concurrency)
 
     file_lock = asyncio.Lock()

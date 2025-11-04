@@ -5,9 +5,9 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 
-from ..core.config import OpenRouterConfig
+from ..core.config import ProviderConfig
 from ..core.types import ChatMessage, ProviderMetadata
-from ..providers.openrouter_client import OpenRouterClient
+from ..providers.litellm_provider import LiteLLMProvider
 
 SCORING_INSTRUCTION = (
     "You are a strict evaluator. Based on the conversation, output ONE number in the range "
@@ -37,13 +37,13 @@ def parse_numeric_score(text: str) -> float | None:
 async def score_with_master_model_async(
     messages: Sequence[ChatMessage],
     model: str | None = None,
-    client: OpenRouterClient | None = None,
+    client: LiteLLMProvider | None = None,
 ) -> tuple[float, ProviderMetadata]:
     """Call the master LLM scorer and return (score, provider metadata)."""
 
-    cfg = OpenRouterConfig.from_env()
+    cfg = ProviderConfig.from_env()
     owns_client = client is None
-    local_client = client or OpenRouterClient(cfg)
+    local_client = client or LiteLLMProvider(cfg)
 
     try:
         augmented = [ChatMessage(role="system", content=SCORING_INSTRUCTION), *messages]
