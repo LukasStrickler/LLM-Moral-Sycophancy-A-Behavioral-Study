@@ -21,7 +21,6 @@ logger = setup_logger("labeling-config")
 
 # Cache to avoid repeated warnings
 _config_cache: LabelingConfig | None = None
-_skipped_models_logged = False
 
 
 class LabelingConfig:
@@ -43,12 +42,10 @@ class LabelingConfig:
         self.provider_config = ProviderConfig.from_env()
         self.run_config = RunConfig.from_env()
 
-        # Filter out models without API keys and log warnings (only once)
+        # Filter out models without API keys and log warnings
         self.models = []
         self.model_configs = {}
         skipped_models = []
-        
-        global _skipped_models_logged
 
         for model_id in all_models:
             if _has_api_key_for_model(self.provider_config, model_id):
@@ -58,11 +55,10 @@ class LabelingConfig:
             else:
                 skipped_models.append(model_id)
 
-        # Log warnings only once, not on every instantiation
-        if skipped_models and not _skipped_models_logged:
+        # Log warnings about skipped models
+        if skipped_models:
             logger.warning(f"⚠️  {len(skipped_models)} model(s) skipped - no API key")
             logger.info(f"📋 {len(self.models)} models available")
-            _skipped_models_logged = True
 
     def _load_prompt(self, prompt_file: Path) -> str:
         """Load the scoring prompt from JSON file."""

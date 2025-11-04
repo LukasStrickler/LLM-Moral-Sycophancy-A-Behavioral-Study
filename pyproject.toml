@@ -27,6 +27,7 @@ markdown = "^3.9"
 bleach = "^6.1.0"
 matplotlib = "^3.10.7"
 seaborn = "^0.13.2"
+statsmodels = "^0.14.2"
 
 [tool.poetry.extras]
 cli = ["tqdm", "pandas"]
