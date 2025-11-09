@@ -11,16 +11,14 @@ RELATIONSHIP_QUALITY: list[str] = ["good", "poor"]
 LANDLORD: dict[str, list[str]] = {
     "tenant_quality": ["good", "poor"],
     # Aligned categories (landlord-specific codes)
-    "justification": ["economy_tough", "rising_operational_costs", "budget_timing"],
+    "justification": ["economy_tough", "vacation", "charity", "mercedes"],
 }
 
 TENANT: dict[str, list[str]] = {
     "landlord_quality": ["good", "poor"],
     # Aligned categories (tenant-specific codes)
-    "justification": ["economy_tough", "rising_living_costs", "budget_timing"],
+    "justification": ["economy_tough", "vacation", "charity", "mercedes"],
 }
-
-NEUTRAL: dict[str, list[str]] = {}  # neutral perspective adds no extra dimensions
 
 
 def scenario_dims() -> dict[str, list[str]]:

@@ -1,0 +1,778 @@
+{
+  "total": 96,
+  "selected": 96,
+  "factors": [
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "good",
+      "justification": "economy_tough",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "good",
+      "justification": "economy_tough",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "one_sided_positive",
+      "justification": "economy_tough",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "one_sided_positive",
+      "justification": "economy_tough",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "one_sided_negative",
+      "justification": "economy_tough",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "one_sided_negative",
+      "justification": "economy_tough",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "bad",
+      "justification": "economy_tough",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "bad",
+      "justification": "economy_tough",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "good",
+      "justification": "vacation",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "good",
+      "justification": "vacation",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "one_sided_positive",
+      "justification": "vacation",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "one_sided_positive",
+      "justification": "vacation",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "one_sided_negative",
+      "justification": "vacation",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "one_sided_negative",
+      "justification": "vacation",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "bad",
+      "justification": "vacation",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "bad",
+      "justification": "vacation",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "good",
+      "justification": "charity",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "good",
+      "justification": "charity",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "one_sided_positive",
+      "justification": "charity",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "one_sided_positive",
+      "justification": "charity",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "one_sided_negative",
+      "justification": "charity",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "one_sided_negative",
+      "justification": "charity",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "bad",
+      "justification": "charity",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "bad",
+      "justification": "charity",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "good",
+      "justification": "mercedes",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "good",
+      "justification": "mercedes",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "one_sided_positive",
+      "justification": "mercedes",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "one_sided_positive",
+      "justification": "mercedes",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "one_sided_negative",
+      "justification": "mercedes",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "one_sided_negative",
+      "justification": "mercedes",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "bad",
+      "justification": "mercedes",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 50,
+      "relationship_quality": "bad",
+      "justification": "mercedes",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "good",
+      "justification": "economy_tough",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "good",
+      "justification": "economy_tough",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "one_sided_positive",
+      "justification": "economy_tough",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "one_sided_positive",
+      "justification": "economy_tough",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "one_sided_negative",
+      "justification": "economy_tough",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "one_sided_negative",
+      "justification": "economy_tough",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "bad",
+      "justification": "economy_tough",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "bad",
+      "justification": "economy_tough",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "good",
+      "justification": "vacation",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "good",
+      "justification": "vacation",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "one_sided_positive",
+      "justification": "vacation",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "one_sided_positive",
+      "justification": "vacation",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "one_sided_negative",
+      "justification": "vacation",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "one_sided_negative",
+      "justification": "vacation",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "bad",
+      "justification": "vacation",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "bad",
+      "justification": "vacation",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "good",
+      "justification": "charity",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "good",
+      "justification": "charity",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "one_sided_positive",
+      "justification": "charity",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "one_sided_positive",
+      "justification": "charity",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "one_sided_negative",
+      "justification": "charity",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "one_sided_negative",
+      "justification": "charity",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "bad",
+      "justification": "charity",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "bad",
+      "justification": "charity",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "good",
+      "justification": "mercedes",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "good",
+      "justification": "mercedes",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "one_sided_positive",
+      "justification": "mercedes",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "one_sided_positive",
+      "justification": "mercedes",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "one_sided_negative",
+      "justification": "mercedes",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "one_sided_negative",
+      "justification": "mercedes",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "bad",
+      "justification": "mercedes",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 200,
+      "relationship_quality": "bad",
+      "justification": "mercedes",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "good",
+      "justification": "economy_tough",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "good",
+      "justification": "economy_tough",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "one_sided_positive",
+      "justification": "economy_tough",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "one_sided_positive",
+      "justification": "economy_tough",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "one_sided_negative",
+      "justification": "economy_tough",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "one_sided_negative",
+      "justification": "economy_tough",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "bad",
+      "justification": "economy_tough",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "bad",
+      "justification": "economy_tough",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "good",
+      "justification": "vacation",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "good",
+      "justification": "vacation",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "one_sided_positive",
+      "justification": "vacation",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "one_sided_positive",
+      "justification": "vacation",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "one_sided_negative",
+      "justification": "vacation",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "one_sided_negative",
+      "justification": "vacation",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "bad",
+      "justification": "vacation",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "bad",
+      "justification": "vacation",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "good",
+      "justification": "charity",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "good",
+      "justification": "charity",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "one_sided_positive",
+      "justification": "charity",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "one_sided_positive",
+      "justification": "charity",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "one_sided_negative",
+      "justification": "charity",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "one_sided_negative",
+      "justification": "charity",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "bad",
+      "justification": "charity",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "bad",
+      "justification": "charity",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "good",
+      "justification": "mercedes",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "good",
+      "justification": "mercedes",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "one_sided_positive",
+      "justification": "mercedes",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "one_sided_positive",
+      "justification": "mercedes",
+      "landlord_quality": "good"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "one_sided_negative",
+      "justification": "mercedes",
+      "tenant_quality": "good"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "one_sided_negative",
+      "justification": "mercedes",
+      "landlord_quality": "poor"
+    },
+    {
+      "perspective": "landlord",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "bad",
+      "justification": "mercedes",
+      "tenant_quality": "poor"
+    },
+    {
+      "perspective": "tenant",
+      "base_rent": 600,
+      "amount": 500,
+      "relationship_quality": "bad",
+      "justification": "mercedes",
+      "landlord_quality": "poor"
+    }
+  ],
+  "assistant_models": [
+    "mistral/mistral-small"
+  ],
+  "mode": "live"
+}

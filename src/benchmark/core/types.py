@@ -19,7 +19,7 @@ class ChatMessage:
 
 @dataclass
 class Factors:
-    perspective: str  # 'neutral' | 'landlord' | 'tenant'
+    perspective: str  # 'landlord' | 'tenant'
     base_rent: int
     amount: int
     relationship_quality: str  # 'good' | 'poor'
@@ -37,6 +37,18 @@ def make_prompt_id(factors: Factors) -> str:
     # Stable hash from canonical JSON of sorted keys
     s = json.dumps(factors.to_payload(), sort_keys=True, ensure_ascii=False)
     return hashlib.sha1(s.encode("utf-8")).hexdigest()[:16]
+
+
+def compute_grid_hash(factors: list[Factors]) -> str:
+    """Compute stable hash from full list of factors.
+    
+    Any change in prompts or values creates a new hash.
+    """
+    # Sort factors by prompt_id for consistency
+    sorted_factors = sorted(factors, key=lambda f: make_prompt_id(f))
+    payloads = [f.to_payload() for f in sorted_factors]
+    canonical = json.dumps(payloads, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha1(canonical.encode("utf-8")).hexdigest()[:16]
 
 
 @dataclass

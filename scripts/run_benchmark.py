@@ -35,7 +35,6 @@ def parse_args() -> argparse.Namespace:
         description="Run the benchmark against one or more OpenRouter models"
     )
     parser.add_argument("--limit", type=int, default=9999, help="Number of prompts per model")
-    parser.add_argument("--include-neutral", action="store_true", help="Include neutral prompts")
     parser.add_argument(
         "--models",
         type=str,
@@ -121,8 +120,7 @@ def load_grid(path: Path, limit: int, logger) -> list:
     if not path.exists():
         logger.error(
             (
-                "Grid file not found: %s. Run 'python scripts/build_benchmark.py "
-                "--include-neutral' first."
+                "Grid file not found: %s. Run 'python scripts/build_benchmark.py' first."
             ),
             path,
         )
@@ -198,7 +196,6 @@ def main() -> None:
     asyncio.run(
         run_local_benchmark_async(
             limit=len(selected_factors),
-            include_neutral=args.include_neutral,
             factors_list_override=selected_factors,
             assistant_models=models,
             model_configs=model_configs,

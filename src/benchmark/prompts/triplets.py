@@ -7,14 +7,15 @@ from ..core.types import Factors
 from .relationship import compute_relationship, quality_to_affinity
 from .schema import AMOUNTS, BASE_RENT, LANDLORD, TENANT
 
-JustCat = Literal["economy", "costs", "timing"]
+JustCat = Literal["economy", "vacation", "charity", "mercedes"]
 
 
 def _justify_category_for_landlord(code: str) -> JustCat:
     mapping = {
         "economy_tough": "economy",
-        "rising_operational_costs": "costs",
-        "budget_timing": "timing",
+        "vacation": "vacation",
+        "charity": "charity",
+        "mercedes": "mercedes",
     }
     return mapping.get(code, "economy")  # type: ignore[return-value]
 
@@ -22,8 +23,9 @@ def _justify_category_for_landlord(code: str) -> JustCat:
 def _justify_category_for_tenant(code: str) -> JustCat:
     mapping = {
         "economy_tough": "economy",
-        "rising_living_costs": "costs",
-        "budget_timing": "timing",
+        "vacation": "vacation",
+        "charity": "charity",
+        "mercedes": "mercedes",
     }
     return mapping.get(code, "economy")  # type: ignore[return-value]
 
@@ -31,32 +33,34 @@ def _justify_category_for_tenant(code: str) -> JustCat:
 def _landlord_code_for_category(cat: JustCat) -> str:
     return {
         "economy": "economy_tough",
-        "costs": "rising_operational_costs",
-        "timing": "budget_timing",
+        "vacation": "vacation",
+        "charity": "charity",
+        "mercedes": "mercedes",
     }[cat]
 
 
 def _tenant_code_for_category(cat: JustCat) -> str:
     return {
         "economy": "economy_tough",
-        "costs": "rising_living_costs",
-        "timing": "budget_timing",
+        "vacation": "vacation",
+        "charity": "charity",
+        "mercedes": "mercedes",
     }[cat]
 
 
-def generate_triplets(include_neutral: bool = True) -> list[Factors]:
-    """Create matched landlord/tenant/neutral prompts per dimension set.
+def generate_triplets() -> list[Factors]:
+    """Create matched landlord/tenant prompts per dimension set.
 
     Dimensions:
     - amount: AMOUNTS
-    - justification categories: {economy, expenses, personal}
+    - justification categories: {economy, vacation, charity, mercedes}
     - pair of qualities: landlord view of tenant x tenant view of landlord
 
     Relationship label is computed from both affinities and attached as
-    the single `relationship_quality` value for all three perspectives.
+    the single `relationship_quality` value for both perspectives.
     """
 
-    cats: list[JustCat] = ["economy", "costs", "timing"]
+    cats: list[JustCat] = ["economy", "vacation", "charity", "mercedes"]
     tenant_qualities = TENANT["landlord_quality"]  # good/poor
     landlord_qualities = LANDLORD["tenant_quality"]  # good/poor
 
@@ -87,16 +91,5 @@ def generate_triplets(include_neutral: bool = True) -> list[Factors]:
                 justification=_tenant_code_for_category(cat),
             )
         )
-
-        if include_neutral:
-            factors.append(
-                Factors(
-                    perspective="neutral",
-                    base_rent=BASE_RENT,
-                    amount=amount,
-                    relationship_quality=rel_label,
-                    justification=None,
-                )
-            )
 
     return factors

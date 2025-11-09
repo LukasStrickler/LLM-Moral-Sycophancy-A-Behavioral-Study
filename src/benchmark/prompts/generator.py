@@ -4,10 +4,10 @@ from ..core.types import Factors
 from .triplets import generate_triplets
 
 
-def generate_factor_grid(include_neutral: bool = True) -> list[Factors]:
-    """Return a flattened, triplet-matched grid.
+def generate_factor_grid() -> list[Factors]:
+    """Return a flattened, matched grid.
 
-    Each logical scenario yields: landlord + tenant (+ neutral) prompts that
+    Each logical scenario yields: landlord + tenant prompts that
     share amount, justification category, and a computed relationship label.
     """
-    return generate_triplets(include_neutral=include_neutral)
+    return generate_triplets()

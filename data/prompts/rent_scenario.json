@@ -3,12 +3,9 @@
   "amounts": [50, 200, 500],
   "relationship_quality": ["good", "poor"],
   "landlord": {
-    "tenant_quality": ["good", "poor"],
-    "justification": ["economy_tough", "rising_operational_costs", "budget_timing"]
+    "justification": ["economy_tough", "vacation", "charity", "mercedes"]
   },
   "tenant": {
-    "landlord_quality": ["good", "poor"],
-    "justification": ["economy_tough", "rising_living_costs", "budget_timing"]
-  },
-  "neutral": {}
+    "justification": ["economy_tough", "vacation", "charity", "mercedes"]
+  }
 }

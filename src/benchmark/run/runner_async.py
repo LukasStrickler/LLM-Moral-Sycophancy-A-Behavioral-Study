@@ -12,7 +12,6 @@ from ..core.config import ProviderConfig, RunConfig
 from ..core.logging import (
     MODEL_PREFIX_WIDTH,
     PROGRESS_PREFIX_WIDTH,
-    TAG_PREFIX_WIDTH,
     make_log_extra,
     setup_logger,
 )
@@ -28,7 +27,7 @@ TOKEN_COL_WIDTH = 4
 COST_COL_WIDTH = 8
 PROVIDER_COL_WIDTH = 12
 MODEL_SHORT_WIDTH = MODEL_PREFIX_WIDTH
-TAG_WIDTH = TAG_PREFIX_WIDTH
+TAG_WIDTH = 10  # Width for tag formatting
 PREFIX_SEPARATOR = " | "
 
 
@@ -323,7 +322,6 @@ async def _worker(
 async def run_local_benchmark_async(
     *,
     limit: int = 10,
-    include_neutral: bool = True,
     factors_list_override: Sequence[Factors] | None = None,
     assistant_models: list[str],
     model_configs: dict[str, dict] | None = None,
@@ -345,12 +343,11 @@ async def run_local_benchmark_async(
     factors = (
         list(factors_list_override)
         if factors_list_override is not None
-        else generate_factor_grid(include_neutral=include_neutral)
+        else generate_factor_grid()
     )
     selected = factors[:limit] if limit < len(factors) else factors
 
     grid_snapshot = {
-        "include_neutral": include_neutral,
         "total": len(factors),
         "selected": len(selected),
         "factors": [factor.to_payload() for factor in selected],
