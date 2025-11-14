@@ -21,21 +21,16 @@ class ChatMessage:
 class Factors:
     perspective: str  # 'landlord' | 'tenant'
     base_rent: int
-    amount: int
-    relationship_quality: str  # 'good' | 'poor'
+    amount: int | None  # None represents XX (blank/nothing)
+    opposite_quality: str | None = None  # 'good' | 'poor' | None (XX)
+    # If "good": landlord sees tenant as "good", tenant sees landlord as "poor"
+    # If "poor": landlord sees tenant as "poor", tenant sees landlord as "good"
+    # If None: both are None (XX)
     justification: str | None = None
-    tenant_quality: str | None = None  # landlord view
-    landlord_quality: str | None = None  # tenant view
-
-    def to_payload(self) -> dict[str, Any]:
-        d = asdict(self)
-        # tool payload should exclude None
-        return {k: v for k, v in d.items() if v is not None}
-
 
 def make_prompt_id(factors: Factors) -> str:
     # Stable hash from canonical JSON of sorted keys
-    s = json.dumps(factors.to_payload(), sort_keys=True, ensure_ascii=False)
+    s = json.dumps(asdict(factors), sort_keys=True, ensure_ascii=False)
     return hashlib.sha1(s.encode("utf-8")).hexdigest()[:16]
 
 
@@ -46,7 +41,7 @@ def compute_grid_hash(factors: list[Factors]) -> str:
     """
     # Sort factors by prompt_id for consistency
     sorted_factors = sorted(factors, key=lambda f: make_prompt_id(f))
-    payloads = [f.to_payload() for f in sorted_factors]
+    payloads = [asdict(f) for f in sorted_factors]
     canonical = json.dumps(payloads, sort_keys=True, ensure_ascii=False)
     return hashlib.sha1(canonical.encode("utf-8")).hexdigest()[:16]
 
@@ -289,6 +284,20 @@ class RunRecord:
 
     def is_success(self) -> bool:
         return self.error in (None, "")
+
+
+def get_next_run_id(file_path: Path) -> int:
+    """Get next sequential run_id for grid hash.
+    
+    Reads existing file to find max run_id, then returns max + 1.
+    If file doesn't exist, returns 1.
+    """
+    if not file_path.exists():
+        return 1
+    max_run_id = 0
+    for record in RunRecord.iter_jsonl(file_path):
+        max_run_id = max(max_run_id, record.run_id)
+    return max_run_id + 1
 
 
 @dataclass

@@ -147,7 +147,7 @@ def push_dataset(
         "-d",
         help="Restrict sync to a single dataset (aita or scenario).",
     ),
-    run_file: Path | None = typer.Option(
+    run_file: str | None = typer.Option(
         None,
         "--run-file",
         help="Optional path to an outputs/runs/<run_id>/run.jsonl file for scenario ingestion.",
@@ -179,12 +179,52 @@ def push_dataset(
     if dataset:
         datasets = [_parse_dataset(dataset)]
 
+    run_file_path: Path | None = None
+    if run_file:
+        run_file_path = Path(run_file)
+
     results = admin.seed_datasets(
         datasets=datasets,
         apply=apply,
-        run_file=run_file,
+        run_file=run_file_path,
         limit=limit,
         record_range=range_tuple,
+        settings=settings,
+    )
+
+    for result in results:
+        _render_seed_result(result, apply)
+
+
+@app.command("push-sampled")
+def push_sampled(
+    run_hash: str = typer.Argument(..., help="Run hash ID (e.g., 2fd32deccbc3905b)"),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Persist changes instead of running a dry-run diff.",
+    ),
+) -> None:
+    """Push sampled data from a run to the scenario dataset."""
+    settings = _require_settings()
+    
+    # Find the sampled_run.jsonl file
+    run_dir = PROJECT_ROOT / "outputs" / "runs" / f"run_{run_hash}"
+    sampled_file = run_dir / "sampled_run.jsonl"
+    
+    if not sampled_file.exists():
+        console.print(f"[red]Error:[/red] Sampled file not found: {sampled_file}")
+        console.print(f"Make sure you've run the notebook to generate sampled_run.jsonl")
+        raise typer.Exit(1)
+    
+    console.print(f"[cyan]Found sampled file:[/cyan] {sampled_file}")
+    
+    results = admin.seed_datasets(
+        datasets=[Dataset.SCENARIO],
+        apply=apply,
+        run_file=sampled_file,
+        limit=None,
+        record_range=None,
         settings=settings,
     )
 

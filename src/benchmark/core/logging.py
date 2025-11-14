@@ -99,7 +99,15 @@ LOG_LEVEL_MAP = {
 def _shorten_model(value: str | None) -> str:
     if not value:
         return ""
-    base = value.split("/", 1)[-1]
+    # Preserve provider prefix for clarity (e.g., "cohere/command-r-plus")
+    # Only strip OpenRouter prefix and version tags
+    if value.startswith("openrouter/"):
+        # For OpenRouter, show the model name without the openrouter/ prefix
+        base = value.split("/", 1)[-1]
+    else:
+        # For other providers, keep the provider prefix
+        base = value
+    # Strip version tags (e.g., ":free")
     base = base.split(":", 1)[0]
     return base[:MODEL_PREFIX_WIDTH]
 

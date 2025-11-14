@@ -8,6 +8,7 @@ import json
 import sys
 from collections import Counter
 from collections.abc import Iterable
+from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -85,10 +86,10 @@ def write_grid(chats, out_path: Path) -> None:
     chats = list(chats)  # Convert generator to list to enable len() call
     width = len(str(len(chats)))  # Compute dynamic width based on number of prompts
     with out_path.open("w", encoding="utf-8") as handle:
-        for idx, prompt in enumerate(chats):
+        for idx, prompt in enumerate(chats, start=1):  # Start at 1 instead of 0
             record = {
                 "prompt_id": f"{idx:0{width}d}",  # Dynamic zero-padding based on total count
-                "factors": prompt.factors.to_payload(),
+                "factors": asdict(prompt.factors),
                 "messages": [{"role": msg.role, "content": msg.content} for msg in prompt.messages],
             }
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")

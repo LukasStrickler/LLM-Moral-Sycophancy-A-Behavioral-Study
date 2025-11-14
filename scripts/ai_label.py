@@ -31,6 +31,13 @@ if str(ROOT) not in sys.path:
 from src.benchmark.core.config import ProviderConfig, RunConfig
 from src.benchmark.core.logging import configure_logging, make_log_extra, setup_logger
 from src.benchmark.core.models import load_models_config
+from src.benchmark.core.retry import (
+    RATE_LIMIT_GUARD,
+    RATE_LIMIT_LOCK,
+    RetryDecision,
+    build_retry_decision,
+    respect_rate_limit_window,
+)
 from src.benchmark.providers.litellm_provider import LiteLLMProvider, _has_api_key_for_model
 from src.labeling_app.core.models import Dataset
 from src.labeling_app.db.libsql import create_client
@@ -120,196 +127,7 @@ def resolve_models(
 
 
 
-class _RetryDecision(NamedTuple):
-    """Represents how the caller should respond to a failed scoring request."""
-
-    should_retry: bool
-    wait_seconds: float
-    label: str
-    summary: str
-
-
-_RETRYABLE_STATUS_CODES = {408, 409, 425, 429, 500, 502, 503, 504}
-_BASE_WAIT_SECONDS = 1.5
-_MAX_WAIT_SECONDS = 65.0
-
-
-def _seconds_until_next_minute(now: float | None = None) -> float:
-    """Return the seconds until the next minute boundary (minimum of one second)."""
-
-    current = now or time.time()
-    remainder = current % 60.0
-    wait = 60.0 - remainder if remainder else 60.0
-    return max(1.0, wait)
-
-
-def _retry_hint_seconds(exc: Exception) -> float | None:
-    """Extract an explicit retry-after hint from headers or error payload."""
-
-    response = getattr(exc, "response", None)
-    headers = getattr(response, "headers", None)
-    candidates: list[str] = []
-
-    if headers:
-        try:
-            for key in headers.keys():  # type: ignore[attr-defined]
-                value = headers.get(key)
-                if not value:
-                    continue
-                lower = key.lower()
-                if lower in {
-                    "retry-after", 
-                    "x-ratelimit-reset", 
-                    "x-ratelimit-reset-requests", 
-                    "x-ratelimit-reset-tokens",
-                    # Cerebras-specific headers
-                    "x-ratelimit-reset-requests-day",
-                    "x-ratelimit-reset-tokens-minute",
-                }:
-                    candidates.append(str(value))
-        except Exception:
-            pass
-
-    for attr in ("retry_after", "retry_after_ms"):
-        value = getattr(exc, attr, None)
-        if value:
-            candidates.append(str(value))
-
-    message = str(exc)
-    match = re.search(r"retry in\s+([\d.]+)s", message, re.IGNORECASE)
-    if match:
-        candidates.append(match.group(1))
-    delay_match = re.search(r'"retryDelay"\s*:\s*"(\d+)s"', message)
-    if delay_match:
-        candidates.append(delay_match.group(1))
-
-    for raw in candidates:
-        raw = raw.strip().lower()
-        if not raw:
-            continue
-        try:
-            value = float(raw)
-        except ValueError:
-            minutes_match = re.fullmatch(r"(?:(?P<m>\d+(?:\.\d+)?)m)?(?:(?P<s>\d+(?:\.\d+)?)s)?", raw)
-            if minutes_match:
-                minutes = float(minutes_match.group("m") or 0)
-                seconds = float(minutes_match.group("s") or 0)
-                value = minutes * 60 + seconds
-            else:
-                try:
-                    from email.utils import parsedate_to_datetime
-
-                    dt = parsedate_to_datetime(raw)
-                    if dt is None:
-                        continue
-                    value = max(0.0, dt.timestamp() - time.time())
-                except Exception:
-                    continue
-        if value > 1e8:  # treat as timestamp
-            if value > 1e12:
-                value /= 1000.0
-            value = max(0.0, value - time.time())
-        if value >= 0:
-            return value
-    return None
-
-
-def _status_code_from_exception(exc: Exception) -> int | None:
-    """Best-effort retrieval of an HTTP status code from LiteLLM exceptions."""
-
-    status_code = getattr(exc, "status_code", None)
-    if isinstance(status_code, int):
-        return status_code
-    response = getattr(exc, "response", None)
-    response_code = getattr(response, "status_code", None)
-    return int(response_code) if isinstance(response_code, int) else None
-
-
-def _is_daily_quota_error(exc: Exception) -> bool:
-    """Return True when the error clearly signals a daily quota exhaustion."""
-
-    message = str(exc).lower()
-    quota_tokens = ("requests per day", "per-day quota", "quotaid", "daily quota", "rpd")
-    return any(token in message for token in quota_tokens)
-
-
-def _classify_exception(exc: Exception) -> tuple[str | None, str]:
-    """Determine the retry label for an exception and capture a short summary."""
-
-    import litellm
-
-    status_code = _status_code_from_exception(exc)
-    summary = str(exc).split("\n", 1)[0] if exc else ""
-
-    if _is_daily_quota_error(exc):
-        return "quota", summary or "daily quota"
-
-    if isinstance(exc, litellm.exceptions.RateLimitError) or status_code == 429:
-        return "limited", summary or "rate limit"
-
-    if isinstance(exc, litellm.exceptions.BadRequestError):
-        return "limited", summary or "bad request"
-
-    transient_types = (
-        litellm.exceptions.APIConnectionError,
-        litellm.exceptions.ServiceUnavailableError,
-        litellm.exceptions.Timeout,
-    )
-    if isinstance(exc, transient_types):
-        return "retry", summary or type(exc).__name__
-
-    if status_code is not None:
-        try:
-            if litellm._should_retry(status_code):
-                return "retry", summary or f"http {status_code}"
-        except Exception:
-            if status_code in _RETRYABLE_STATUS_CODES:
-                return "retry", summary or f"http {status_code}"
-
-    lowered = summary.lower()
-    for token in ("temporary", "try again", "timeout", "connection reset", "overloaded"):
-        if token in lowered:
-            return "retry", summary or token
-
-    return None, summary or type(exc).__name__
-
-
-def _build_retry_decision(exc: Exception, attempt: int) -> _RetryDecision:
-    """Create a retry decision for the given exception and attempt index (1-indexed)."""
-
-    label, summary = _classify_exception(exc)
-    if label == "quota":
-        return _RetryDecision(False, 0.0, label, summary)
-    if label is None:
-        return _RetryDecision(False, 0.0, "nonretry", summary)
-
-    wait_seconds = _retry_hint_seconds(exc)
-    if wait_seconds is None:
-        if label == "limited":
-            wait_seconds = max(5.0, _seconds_until_next_minute() + 1.0)
-        else:
-            wait_seconds = _BASE_WAIT_SECONDS * (2 ** (attempt - 1))
-    wait_seconds = min(_MAX_WAIT_SECONDS, wait_seconds)
-    wait_seconds = max(1.0, wait_seconds + random.uniform(0.25, 0.75))
-
-    return _RetryDecision(True, wait_seconds, label, summary)
-
-
-
-RATE_LIMIT_GUARD: dict[str, float] = {}
-RATE_LIMIT_LOCK = asyncio.Lock()
-
-
-async def _respect_rate_limit_window(provider_name: str | None) -> None:
-    if not provider_name:
-        return
-    while True:
-        async with RATE_LIMIT_LOCK:
-            available = RATE_LIMIT_GUARD.get(provider_name, 0.0)
-        delay = available - time.time()
-        if delay <= 0:
-            return
-        await asyncio.sleep(delay)
+# Retry logic is now in src.benchmark.core.retry - imported above
 
 async def score_with_retry(
     client: LiteLLMProvider,
@@ -324,7 +142,7 @@ async def score_with_retry(
 
     for attempt in range(1, max_attempts + 1):
         try:
-            await _respect_rate_limit_window(provider_name)
+            await respect_rate_limit_window(provider_name)
             score, metadata = await score_response_async(
                 prompt_title=response["prompt_title"],
                 prompt_body=response["prompt_body"],
@@ -338,7 +156,7 @@ async def score_with_retry(
             cost = metadata.cost_usd or 0.0
             return score, True, cost
         except Exception as exc:
-            decision = _build_retry_decision(exc, attempt)
+            decision = build_retry_decision(exc, attempt)
             progress = get_progress()
             status_code = _status_code_from_exception(exc)
             details = [f"attempt={attempt}/{max_attempts}"]
