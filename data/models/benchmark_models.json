@@ -36,36 +36,65 @@
     "concurrency": 3
   },
   {
-    "id": "groq/llama-3.3-70b",
-    "label": "Llama 3.3 70B (Groq)",
+    "id": "groq/llama-3.3-70b-versatile",
+    "label": "Llama 3.3 70B Versatile (Groq)",
     "provider": "Groq",
     "concurrency": 3
   },
   {
-    "id": "groq/llama-3.1-8b",
-    "label": "Llama 3.1 8B (Groq)",
+    "id": "groq/llama-3.1-8b-instant",
+    "label": "Llama 3.1 8B Instant (Groq)",
     "provider": "Groq",
     "concurrency": 3
   },
   {
-    "id": "groq/gpt-oss-20b",
+    "id": "groq/openai/gpt-oss-20b",
     "label": "GPT-OSS 20B (Groq)",
     "provider": "Groq",
     "concurrency": 3
   },
   {
-    "id": "groq/gpt-oss-120b",
+    "id": "groq/openai/gpt-oss-120b",
     "label": "GPT-OSS 120B (Groq)",
     "provider": "Groq",
     "concurrency": 3
   },
   {
-    "id": "groq/qwen-3-32b",
+    "id": "groq/qwen/qwen3-32b",
     "label": "Qwen 3 32B (Groq)",
     "provider": "Groq",
     "concurrency": 3
   },
   {
+    "id": "groq/meta-llama/llama-4-maverick-17b-128e-instruct",
+    "label": "Llama 4 Maverick 17B 128E (Groq)",
+    "provider": "Groq",
+    "concurrency": 3
+  },
+  {
+    "id": "groq/meta-llama/llama-4-scout-17b-16e-instruct",
+    "label": "Llama 4 Scout 17B 16E (Groq)",
+    "provider": "Groq",
+    "concurrency": 3
+  },
+  {
+    "id": "groq/groq/compound",
+    "label": "Compound (Groq)",
+    "provider": "Groq",
+    "concurrency": 3
+  },
+  {
+    "id": "groq/groq/compound-mini",
+    "label": "Compound Mini (Groq)",
+    "provider": "Groq",
+    "concurrency": 3
+  },
+  {
+    "id": "groq/moonshotai/kimi-k2-instruct",
+    "label": "Kimi K2 Instruct (Groq)",
+    "provider": "Groq",
+    "concurrency": 3
+  },  {
     "id": "huggingface/qwen-2.5-72b",
     "label": "Qwen 2.5 72B",
     "provider": "Hugging Face",
@@ -78,32 +107,62 @@
     "concurrency": 3
   },
   {
-    "id": "cerebras/llama-3.1-70b",
-    "label": "Llama 3.1 70B (Cerebras)",
+    "id": "cerebras/llama-3.3-70b",
+    "label": "Llama 3.3 70B (Cerebras)",
     "provider": "Cerebras",
-    "concurrency": 3
+    "concurrency": 2
   },
   {
-    "id": "mistral/mistral-small",
+    "id": "cerebras/qwen-3-235b-a22b-instruct-2507",
+    "label": "Qwen 3 235B Instruct (Cerebras)",
+    "provider": "Cerebras",
+    "concurrency": 2
+  },
+  {
+    "id": "cerebras/qwen-3-235b-a22b-thinking-2507",
+    "label": "Qwen 3 235B Thinking (Cerebras)",
+    "provider": "Cerebras",
+    "concurrency": 2
+  },
+  {
+    "id": "mistral/mistral-small-latest",
     "label": "Mistral Small",
     "provider": "Mistral AI",
     "concurrency": 3
   },
   {
-    "id": "mistral/mistral-nemo",
-    "label": "Mistral Nemo",
+    "id": "mistral/mistral-large-latest",
+    "label": "Mistral Large",
     "provider": "Mistral AI",
-    "concurrency": 3
+    "concurrency": 2
   },
   {
-    "id": "cohere/command-r-plus",
-    "label": "Command R+",
+    "id": "mistral/mistral-medium-latest",
+    "label": "Mistral Medium",
+    "provider": "Mistral AI",
+    "concurrency": 2
+  },
+  {
+    "id": "mistral/magistral-medium-2506",
+    "label": "Magistral Medium",
+    "provider": "Mistral AI",
+    "concurrency": 2
+  },
+  {
+    "id": "cohere/command-r-plus-08-2024",
+    "label": "Command R+ (08-2024)",
     "provider": "Cohere",
     "concurrency": 3
   },
   {
-    "id": "cohere/command-r",
-    "label": "Command R",
+    "id": "cohere/command-r-08-2024",
+    "label": "Command R (08-2024)",
+    "provider": "Cohere",
+    "concurrency": 3
+  },
+  {
+    "id": "cohere/command-a-03-2025",
+    "label": "Command A (03-2025)",
     "provider": "Cohere",
     "concurrency": 3
   },
@@ -128,6 +187,42 @@
   {
     "id": "openrouter/tngtech/deepseek-r1t2-chimera:free",
     "label": "DeepSeek R1T2 Chimera (free)",
+    "provider": "OpenRouter",
+    "concurrency": 3
+  },
+  {
+    "id": "openrouter/tngtech/deepseek-r1t-chimera:free",
+    "label": "DeepSeek R1T Chimera (free)",
+    "provider": "OpenRouter",
+    "concurrency": 3
+  },
+  {
+    "id": "openrouter/deepseek/deepseek-r1-0528:free",
+    "label": "DeepSeek R1 0528 (free)",
+    "provider": "OpenRouter",
+    "concurrency": 3
+  },
+  {
+    "id": "openrouter/deepseek/deepseek-r1-distill-llama-70b:free",
+    "label": "DeepSeek R1 Distill Llama 70B (free)",
+    "provider": "OpenRouter",
+    "concurrency": 3
+  },
+  {
+    "id": "openrouter/deepseek/deepseek-r1-0528-qwen3-8b:free",
+    "label": "DeepSeek R1 0528 Qwen3 8B (free)",
+    "provider": "OpenRouter",
+    "concurrency": 3
+  },
+  {
+    "id": "openrouter/cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+    "label": "Dolphin Mistral 24B Venice (free)",
+    "provider": "OpenRouter",
+    "concurrency": 3
+  },
+  {
+    "id": "openrouter/mistralai/mistral-small-3.2-24b-instruct:free",
+    "label": "Mistral Small 3.2 24B Instruct (free)",
     "provider": "OpenRouter",
     "concurrency": 3
   }
