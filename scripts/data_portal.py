@@ -41,7 +41,7 @@ def _require_settings() -> AppSettings:
 def _interactive_dataset_prompt(allow_all: bool = False) -> str | None:
     suffix = "/all" if allow_all else ""
     default_value = "all" if allow_all else "aita"
-    user_input = typer.prompt(f"Dataset [aita/scenario{suffix}]", default=default_value)
+    user_input = typer.prompt(f"Dataset [aita/scenario/dearabby{suffix}]", default=default_value)
     normalized = user_input.strip().lower()
     if allow_all and normalized in {"all", ""}:
         return None
@@ -81,14 +81,38 @@ def _interactive_menu(ctx: typer.Context) -> None:
                     "Limit number of records (press Enter for no limit)", default=""
                 )
                 limit = int(limit_input) if limit_input.strip() else None
+                
+                # For SCENARIO and DEARABBY, try to find run file automatically
+                run_file_path: Path | None = None
+                if dataset_value and dataset_value in ("scenario", "dearabby"):
+                    settings = get_settings()
+                    if dataset_value == "scenario":
+                        # Try to find latest run file for scenario
+                        candidate = settings.find_latest_run_file()
+                        if candidate and candidate.exists():
+                            run_file_path = candidate
+                            console.print(f"[cyan]Found run file:[/cyan] {candidate}")
+                    elif dataset_value == "dearabby":
+                        # For dearabby, check for the specific sampled file
+                        dearabby_run = PROJECT_ROOT / "outputs/runs/run_f2d3e4b22e01564f/sampled_run.jsonl"
+                        if dearabby_run.exists():
+                            run_file_path = dearabby_run
+                            console.print(f"[cyan]Found run file:[/cyan] {dearabby_run}")
+                        else:
+                            run_file_input = typer.prompt(
+                                "Enter path to run file (or press Enter to skip)", default=""
+                            )
+                            if run_file_input.strip():
+                                run_file_path = Path(run_file_input.strip())
+                
                 apply_changes = choice == "3" and typer.confirm(
                     "Apply changes to the database?", default=True
                 )
-                ctx.invoke(
-                    push_dataset,
+                # Call push_dataset directly instead of using ctx.invoke to avoid typer context issues
+                push_dataset(
                     apply=apply_changes,
                     dataset=dataset_value,
-                    run_file=None,
+                    run_file=str(run_file_path) if run_file_path else None,
                     limit=limit,
                     record_start=None,
                     record_end=None,
@@ -102,7 +126,10 @@ def _interactive_menu(ctx: typer.Context) -> None:
         except typer.BadParameter as exc:
             console.print(f"[red]Error:[/red] {exc}")
         except Exception as exc:  # pragma: no cover - defensive interactive fallback
+            import traceback
             console.print(f"[red]Unexpected error:[/red] {exc}")
+            console.print(f"[red]Traceback:[/red]")
+            console.print(traceback.format_exc())
 
 
 @app.callback()

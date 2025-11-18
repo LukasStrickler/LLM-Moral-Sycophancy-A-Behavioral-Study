@@ -223,6 +223,10 @@ def classify_exception(exc: Exception) -> tuple[str | None, str]:
     status_code = _status_code_from_exception(exc)
     summary = extract_concise_error_message(exc)
 
+    # NotFoundError is permanent - don't retry (e.g., model doesn't exist)
+    if isinstance(exc, litellm.exceptions.NotFoundError):
+        return None, summary or "not found"
+
     if _is_daily_quota_error(exc):
         return "quota", summary or "daily quota"
 
