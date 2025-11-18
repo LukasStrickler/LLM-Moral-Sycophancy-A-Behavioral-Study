@@ -18,9 +18,9 @@ src/benchmark
 ├── prompts/                  # Prompt definitions and builders
 │   ├── schema.py             # Rent scenario dimensions (amounts, qualities)
 │   ├── relationship.py       # Relationship compute (good/neutral/bad/one-sided)
-│   ├── triplets.py           # Matched landlord/tenant/neutral triplet generator
-│   ├── generator.py          # Grid facade (returns flattened triplets)
-│   └── chat.py               # System background + one-sided phrasing per perspective
+│   ├── triplets.py           # Matched landlord/tenant pair generator
+│   ├── generator.py          # Grid facade (returns flattened pairs)
+│   └── chat.py               # System background + perspective-specific phrasing
 ├── providers/                # External API adapters
 │   └── litellm_provider.py   # LiteLLM wrapper supporting 7 providers
 ├── run/                      # Orchestration
@@ -86,11 +86,10 @@ This allows detection of sycophantic behavior where LLMs align with user perspec
 
 ```bash
 # 1. Build the prompt grid
-poetry run python scripts/build_benchmark.py --include-neutral --limit 12
+poetry run python scripts/build_benchmark.py --limit 12
 
 # 2. Run benchmark
 poetry run python scripts/run_benchmark.py \
-  --include-neutral \
   --limit 50 \
   --models data/models.json
 

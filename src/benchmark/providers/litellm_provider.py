@@ -360,10 +360,12 @@ class LiteLLMProvider:
         if self.run_cfg.request_timeout_s and "timeout" not in request_args:
             request_args["timeout"] = self.run_cfg.request_timeout_s
 
-        if self.run_cfg.max_retries is not None and "num_retries" not in request_args:
-            request_args["num_retries"] = self.run_cfg.max_retries
+        # Disable LiteLLM's built-in retries - we handle retries ourselves with better logic
+        # in runner_async.py using the retry module
+        if "num_retries" not in request_args:
+            request_args["num_retries"] = 0
 
-        request_args.setdefault("temperature", DEFAULT_TEMPERATURE)
+        # Temperature uses provider default (not setting it explicitly)
         
         # Add OpenRouter metadata for data policy (allows free models to work)
         # OpenRouter requires users to configure privacy settings, but we can specify

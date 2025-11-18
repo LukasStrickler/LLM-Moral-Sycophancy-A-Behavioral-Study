@@ -99,14 +99,15 @@ def seed_datasets(
     results: list[SeedRunResult] = []
     with client_scope(settings) as client:
         for dataset in selected:
-            payloads = seeding.load_seed_payloads(dataset, settings=settings, limit=limit)
             source = "seed"
             used_run_file: Path | None = None
             note: str | None = None
             skipped_messages: list[str] = []
+            payloads: list[seeding.LLMResponsePayload] = []
 
-            if dataset is Dataset.SCENARIO:
-                candidate_run_file = run_file or settings.find_latest_run_file()
+            # Check for run file first (for SCENARIO and DEARABBY)
+            if dataset in (Dataset.SCENARIO, Dataset.DEARABBY):
+                candidate_run_file = run_file or (settings.find_latest_run_file() if dataset is Dataset.SCENARIO else None)
                 if candidate_run_file and candidate_run_file.exists():
                     used_run_file = candidate_run_file
                     payloads, skipped_messages = seeding.payloads_from_run_file(
@@ -116,15 +117,20 @@ def seed_datasets(
                         record_range=record_range,
                     )
                     source = "run"
+            
+            # Only load from seed if no run file was used
+            if source == "seed":
+                payloads = seeding.load_seed_payloads(dataset, settings=settings, limit=limit)
             if skipped_messages:
                 note = (
                     (note + " ") if note else ""
                 ) + f"Skipped {len(skipped_messages)} run records (e.g., {skipped_messages[0]})."
-            elif dataset is Dataset.SCENARIO:
+            elif dataset in (Dataset.SCENARIO, Dataset.DEARABBY):
                 if run_file and not (used_run_file and source == "run"):
                     note = f"Run file not found: {run_file}"
                 elif not run_file:
-                    note = "No scenario run file detected; using seed payloads only."
+                    dataset_name = "scenario" if dataset is Dataset.SCENARIO else "dearabby"
+                    note = f"No {dataset_name} run file detected; using seed payloads only."
 
             diff = seeding.sync_dataset(client, dataset, payloads, apply_changes=apply)
             total_responses = queries.count_responses(client, dataset)

@@ -141,6 +141,8 @@ def load_seed_payloads(
         seed_path = settings.paths.seeds / "aita_seed.jsonl"
     elif dataset is Dataset.SCENARIO:
         seed_path = settings.paths.seeds / "scenario_seed.jsonl"
+    elif dataset is Dataset.DEARABBY:
+        seed_path = settings.paths.seeds / "dearabby_seed.jsonl"
     else:
         raise SeedError(f"Unsupported dataset: {dataset}")
 
@@ -153,6 +155,9 @@ def load_seed_payloads(
         elif dataset is Dataset.SCENARIO:
             # For SCENARIO: even distribution across models and prompt IDs
             payloads = _apply_even_distribution_limit(payloads, limit)
+        elif dataset is Dataset.DEARABBY:
+            # For DEARABBY: simple limit (first N records), same as AITA
+            payloads = payloads[:limit]
 
     return payloads
 
@@ -314,8 +319,8 @@ def payloads_from_run_file(
     record_range: tuple[int, int | None] | None = None,
 ) -> tuple[list[LLMResponsePayload], list[str]]:
     """Create payloads from a run artifact, skipping malformed records."""
-    if dataset is not Dataset.SCENARIO:
-        raise SeedError("Run ingestion is currently only supported for the scenario dataset.")
+    if dataset not in (Dataset.SCENARIO, Dataset.DEARABBY):
+        raise SeedError(f"Run ingestion not supported for dataset: {dataset}")
 
     if not run_path.exists():
         raise SeedError(f"Run file does not exist: {run_path}")
@@ -349,7 +354,12 @@ def payloads_from_run_file(
 
     # Apply limit after payloads are created and validated
     if limit is not None:
-        payloads = _apply_even_distribution_limit(payloads, limit)
+        if dataset is Dataset.SCENARIO:
+            # For SCENARIO: even distribution across models and prompt IDs
+            payloads = _apply_even_distribution_limit(payloads, limit)
+        elif dataset is Dataset.DEARABBY:
+            # For DEARABBY: even distribution across models and prompt IDs (same as SCENARIO)
+            payloads = _apply_even_distribution_limit(payloads, limit)
 
     return payloads, skipped
 
@@ -367,8 +377,11 @@ def _payload_from_run_record(
     user_messages = [msg for msg in messages if msg.get("role") == "user"]
     prompt_body = user_messages[-1].get("content") or record.get("prompt", "") if user_messages else record.get("prompt", "")
 
-    if not all([prompt_id, perspective, model_id]):
-        raise SeedError("missing prompt_id/perspective/model_id")
+    # Validate required fields based on dataset
+    if not prompt_id or not model_id:
+        raise SeedError("missing prompt_id/model_id")
+    if dataset is Dataset.SCENARIO and not perspective:
+        raise SeedError("missing perspective for scenario dataset")
     if not response_text:
         raise SeedError("empty response text")
 
@@ -381,7 +394,11 @@ def _payload_from_run_record(
         "prompt_id": prompt_id,
     }
 
-    prompt_title = f"{dataset.value.capitalize()} prompt {prompt_id} ({perspective})"
+    # Generate prompt_title - handle null perspective for Dear Abby
+    if perspective:
+        prompt_title = f"{dataset.value.capitalize()} prompt {prompt_id} ({perspective})"
+    else:
+        prompt_title = f"{dataset.value.capitalize()} prompt {prompt_id}"
 
     run_id = str(record.get("run_id") or run_identifier)
 

@@ -50,10 +50,19 @@ class DatabaseClient:
         """Execute a single SQL statement and return a normalized result."""
         params = list(parameters or [])
         if self._driver == "libsql":
-            result = self._connection.execute(sql, params)
-            columns = list(getattr(result, "columns", []) or _description_to_columns(result))
-            rows = list(result.rows)
-            return QueryResult(columns=columns, rows=rows)
+            try:
+                result = self._connection.execute(sql, params)
+                columns = list(getattr(result, "columns", []) or _description_to_columns(result))
+                rows = list(result.rows)
+                return QueryResult(columns=columns, rows=rows)
+            except KeyError as exc:
+                # libsql HTTP client may return error responses without "result" key
+                # This often indicates a database constraint violation or connection issue
+                raise RuntimeError(
+                    f"Database error: The database rejected the query. "
+                    f"This may be due to a constraint violation (e.g., invalid dataset value) "
+                    f"or a connection issue. Original error: {exc}"
+                ) from exc
 
         cursor = self._connection.cursor()
         cursor.execute(sql, params)
@@ -72,7 +81,16 @@ class DatabaseClient:
         """
         if self._driver == "libsql":
             for params in param_sets:
-                self._connection.execute(sql, list(params))
+                try:
+                    self._connection.execute(sql, list(params))
+                except KeyError as exc:
+                    # libsql HTTP client may return error responses without "result" key
+                    # This often indicates a database constraint violation or connection issue
+                    raise RuntimeError(
+                        f"Database error: The database rejected the query. "
+                        f"This may be due to a constraint violation (e.g., invalid dataset value) "
+                        f"or a connection issue. Original error: {exc}"
+                    ) from exc
             return
 
         cursor = self._connection.cursor()
@@ -178,7 +196,7 @@ def ensure_schema(client: DatabaseClient) -> None:
         """
         CREATE TABLE IF NOT EXISTS llm_responses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            dataset TEXT NOT NULL CHECK (dataset IN ('aita', 'scenario')),
+            dataset TEXT NOT NULL CHECK (dataset IN ('aita', 'scenario', 'dearabby')),
             prompt_title TEXT NOT NULL,
             prompt_body TEXT NOT NULL,
             model_response_text TEXT NOT NULL,

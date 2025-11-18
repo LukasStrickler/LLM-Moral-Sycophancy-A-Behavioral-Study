@@ -19,24 +19,20 @@ The `rent_scenario.json` file defines the following dimensions:
 
 #### Landlord Perspective
 - **`landlord.tenant_quality`** (`list[str]`): How the landlord perceives the tenant
-- **`landlord.justification`** (`list[str]`): Reasons a landlord might give for raising rent (aligned categories: `economy_tough`, `rising_operational_costs`, `budget_timing`)
+- **`landlord.justification`** (`list[str]`): Reasons a landlord might give for raising rent (categories: `economy_tough`, `vacation`, `charity`, `mercedes`)
 
 #### Tenant Perspective  
 - **`tenant.landlord_quality`** (`list[str]`): How a tenant perceives the landlord
-- **`tenant.justification`** (`list[str]`): Reasons a tenant might cite for opposing rent increases (aligned categories: `economy_tough`, `rising_living_costs`, `budget_timing`)
-
-#### Neutral Baseline
-- **`neutral`** (`object`): Reserved for perspective-specific attributes; left empty for neutral prompts
+- **`tenant.justification`** (`list[str]`): Reasons a tenant might cite for opposing rent increases (categories: `economy_tough`, `vacation`, `charity`, `mercedes`)
 
 ## Prompt Generation
 
-Prompts are produced in matched triplets by `src/benchmark/prompts/generator.py` and converted to chat prompts:
+Prompts are produced in matched pairs by `src/benchmark/prompts/generator.py` and converted to chat prompts:
 
-1. **Landlord perspective**: One‑sided, indirect phrasing that implies the role (no explicit “I’m the landlord”).
-2. **Tenant perspective**: One‑sided, indirect phrasing that implies the role (no explicit “I’m the tenant”).
-3. **Neutral**: Control phrasing with balanced ask.
+1. **Landlord perspective**: Explicit LANDLORD prefix with first-person phrasing describing the landlord's perspective.
+2. **Tenant perspective**: Explicit TENANT prefix with first-person phrasing describing the tenant's perspective.
 
-Triplets share the same base dimensions (amount, justification category: economy, costs, timing) and a computed relationship label derived from the landlord↔tenant quality pair.
+Pairs share the same base dimensions (amount, justification category: economy, vacation, charity, mercedes) and a computed relationship label derived from the landlord↔tenant quality pair.
 
 ## Scoring System
 
@@ -55,12 +51,13 @@ To modify scenarios, update `rent_scenario.json` with new:
 - Justification types
 - Perspective-specific attributes
 
-The prompt generator automatically creates matched combinations so every scenario yields 1 landlord + 1 tenant + 1 neutral prompt.
+The prompt generator automatically creates matched combinations so every scenario yields 1 landlord + 1 tenant prompt.
 
 Notes on phrasing:
-- Indirect role cues: avoid role declarations; use natural chat phrasing.
+- Explicit LANDLORD/TENANT prefixes: prompts start with "LANDLORD:" or "TENANT:" to clearly indicate perspective.
+- First-person phrasing: prompts use "I am a landlord/tenant" to establish the role explicitly.
 - Advice‑seeking, one‑sided asks per perspective to support sycophancy measurement.
-- Background context is provided via a system message as compact JSON (“Context to recall …”).
+- Background context is provided via a system message as compact JSON ("Context to recall …").
 
 ## Rate Limiting Recommendations
 

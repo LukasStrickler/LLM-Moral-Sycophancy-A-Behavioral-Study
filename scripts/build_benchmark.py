@@ -8,6 +8,7 @@ import json
 import sys
 from collections import Counter
 from collections.abc import Iterable
+from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -46,19 +47,6 @@ def parse_args() -> argparse.Namespace:
             "If --limit is omitted, every combination is written."
         )
     )
-    parser.add_argument(
-        "--include-neutral",
-        dest="include_neutral",
-        action="store_true",
-        default=True,
-        help="Include neutral perspective prompts (default: True)",
-    )
-    parser.add_argument(
-        "--no-include-neutral",
-        dest="include_neutral",
-        action="store_false",
-        help="Exclude neutral perspective prompts",
-    )
     parser.add_argument("--limit", type=int, help="Number of prompts to include (omit for ALL)")
     parser.add_argument(
         "--out", type=str, help="Output JSONL path (defaults to outputs/raw/grid.jsonl)"
@@ -74,18 +62,17 @@ def validate_limit(limit: int | None) -> int | None:
     return limit
 
 
-def select_prompts(include_neutral: bool, limit: int | None) -> Iterable:
+def select_prompts(limit: int | None) -> Iterable:
     from src.benchmark.prompts.generator import generate_factor_grid
 
-    factors = generate_factor_grid(include_neutral=include_neutral)
+    factors = generate_factor_grid()
     total = len(factors)
     counts = Counter(f.perspective for f in factors)
-    print(f"Grid generated: {total} factor combinations (include_neutral={include_neutral})")
+    print(f"Grid generated: {total} factor combinations")
     print(
-        "Breakdown -> landlord: {landlord}, tenant: {tenant}, neutral: {neutral}".format(
+        "Breakdown -> landlord: {landlord}, tenant: {tenant}".format(
             landlord=counts.get("landlord", 0),
             tenant=counts.get("tenant", 0),
-            neutral=counts.get("neutral", 0),
         )
     )
 
@@ -99,10 +86,10 @@ def write_grid(chats, out_path: Path) -> None:
     chats = list(chats)  # Convert generator to list to enable len() call
     width = len(str(len(chats)))  # Compute dynamic width based on number of prompts
     with out_path.open("w", encoding="utf-8") as handle:
-        for idx, prompt in enumerate(chats):
+        for idx, prompt in enumerate(chats, start=1):  # Start at 1 instead of 0
             record = {
                 "prompt_id": f"{idx:0{width}d}",  # Dynamic zero-padding based on total count
-                "factors": prompt.factors.to_payload(),
+                "factors": asdict(prompt.factors),
                 "messages": [{"role": msg.role, "content": msg.content} for msg in prompt.messages],
             }
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -123,7 +110,7 @@ def main() -> None:
 
     from src.benchmark.prompts.chat import build_chat_from_factors
 
-    prompts = [build_chat_from_factors(f) for f in select_prompts(args.include_neutral, limit)]
+    prompts = [build_chat_from_factors(f) for f in select_prompts(limit)]
 
     out_path = Path(args.out) if args.out else DEFAULT_GRID_PATH
     write_grid(prompts, out_path)

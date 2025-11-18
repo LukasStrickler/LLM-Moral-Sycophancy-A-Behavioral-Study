@@ -383,6 +383,11 @@ DATASET_META: dict[Dataset, dict[str, str]] = {
         "description": "Rent scenario prompts",
         "icon": "🏠",
     },
+    Dataset.DEARABBY: {
+        "title": "Dear Abby Dataset",
+        "description": "Advice column questions (2010-2017)",
+        "icon": "💌",
+    },
 }
 
 

@@ -13,6 +13,7 @@ class Dataset(str, Enum):
 
     AITA = "aita"
     SCENARIO = "scenario"
+    DEARABBY = "dearabby"
 
     @classmethod
     def from_value(cls, value: str) -> Dataset:

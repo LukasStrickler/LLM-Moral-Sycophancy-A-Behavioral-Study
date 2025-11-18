@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import sys
 import time
@@ -32,10 +33,9 @@ def ensure_project_on_path() -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run the benchmark against one or more OpenRouter models"
+        description="Run the benchmark against one or more models. Supports rent scenario grids (default) and custom grids (Dear Abby)."
     )
     parser.add_argument("--limit", type=int, default=9999, help="Number of prompts per model")
-    parser.add_argument("--include-neutral", action="store_true", help="Include neutral prompts")
     parser.add_argument(
         "--models",
         type=str,
@@ -45,7 +45,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model", type=str, help="Run a single model id")
     parser.add_argument("--out", type=str, help="Custom run output path or JSONL file")
     parser.add_argument(
-        "--grid", type=str, default=str(DEFAULT_GRID_PATH), help="Path to prebuilt grid JSONL"
+        "--grid", 
+        type=str, 
+        default=str(DEFAULT_GRID_PATH), 
+        help="Path to prebuilt grid JSONL (default: outputs/raw/grid.jsonl for rent scenario, or outputs/raw/dearabby_grid.jsonl for Dear Abby)"
     )
     parser.add_argument(
         "--dry-run",
@@ -81,7 +84,8 @@ def resolve_models(args: argparse.Namespace, cfg) -> tuple[list[str], dict[str, 
         sys.exit(1)
 
 
-def resolve_run_paths(out_arg: str | None, timestamp: int) -> tuple[Path, Path]:
+def resolve_run_paths(out_arg: str | None, grid_hash: str) -> tuple[Path, Path]:
+    """Resolve run paths using grid hash instead of timestamp."""
     if out_arg:
         user_path = Path(out_arg)
         if user_path.suffix == ".jsonl":
@@ -90,39 +94,83 @@ def resolve_run_paths(out_arg: str | None, timestamp: int) -> tuple[Path, Path]:
         user_path.mkdir(parents=True, exist_ok=True)
         return user_path, user_path / "run.jsonl"
 
-    run_dir = Path(f"outputs/runs/{timestamp}")
-    run_dir.mkdir(parents=True, exist_ok=True)
-    return run_dir, run_dir / "run.jsonl"
+    # Folder structure: outputs/runs/run_{grid_hash}/run.jsonl
+    runs_dir = Path("outputs/runs")
+    run_folder = runs_dir / f"run_{grid_hash}"
+    run_folder.mkdir(parents=True, exist_ok=True)
+    run_jsonl = run_folder / "run.jsonl"
+    return run_folder, run_jsonl
 
 
 def parse_factors(entry: dict):
+    """Parse Factors from grid entry (for rent scenario)."""
     ensure_project_on_path()
     from src.benchmark.core.types import Factors
 
     payload = entry.get("factors") or {}
-    required = {"perspective", "base_rent", "amount", "relationship_quality"}
+    required = {"perspective", "base_rent", "amount"}
     if not required.issubset(payload):
         return None
     try:
+        # Handle amount which can be None (XX) or an int
+        amount = payload["amount"]
+        if amount is not None:
+            amount = int(amount)
+        
         return Factors(
             perspective=str(payload["perspective"]),
             base_rent=int(payload["base_rent"]),
-            amount=int(payload["amount"]),
-            relationship_quality=str(payload["relationship_quality"]),
+            amount=amount,  # Can be None or int
+            opposite_quality=payload.get("opposite_quality"),  # Can be None, "good", or "poor"
             justification=payload.get("justification"),
-            tenant_quality=payload.get("tenant_quality"),
-            landlord_quality=payload.get("landlord_quality"),
         )
     except (TypeError, ValueError):
         return None
 
 
-def load_grid(path: Path, limit: int, logger) -> list:
+def parse_custom_prompt(entry: dict):
+    """Parse custom prompt from grid entry (for Dear Abby or other custom grids)."""
+    ensure_project_on_path()
+    from src.benchmark.core.types import ChatMessage, PromptInstance
+    
+    messages = entry.get("messages")
+    if not messages:
+        return None
+    
+    # Convert message dicts to ChatMessage objects
+    chat_messages = []
+    for msg in messages:
+        if isinstance(msg, dict) and "role" in msg and "content" in msg:
+            chat_messages.append(ChatMessage(role=msg["role"], content=msg["content"]))
+    
+    if not chat_messages:
+        return None
+    
+    prompt_id = entry.get("prompt_id", "")
+    factors_dict = entry.get("factors", {})  # Store metadata here
+    
+    # Create a dummy Factors object for compatibility (or None)
+    # The runner will use messages directly
+    return {
+        "prompt_id": prompt_id,
+        "messages": chat_messages,
+        "factors_dict": factors_dict,
+    }
+
+
+def load_grid(path: Path, limit: int, logger) -> tuple[list, dict, bool]:
+    """Load grid and return (prompts, prompt_id_map, is_custom).
+    
+    Returns:
+        prompts: List of Factors (rent scenario) or dicts with messages (custom)
+        prompt_id_map: Maps prompt identifiers to prompt_id from grid.jsonl
+        is_custom: True if this is a custom grid (Dear Abby), False if rent scenario
+    """
     if not path.exists():
         logger.error(
             (
-                "Grid file not found: %s. Run 'python scripts/build_benchmark.py "
-                "--include-neutral' first."
+                "Grid file not found: %s. Run 'python scripts/build_benchmark.py' "
+                "or 'python scripts/build_dearabby_grid.py' first."
             ),
             path,
         )
@@ -131,21 +179,49 @@ def load_grid(path: Path, limit: int, logger) -> list:
     with path.open("r", encoding="utf-8") as handle:
         records = [json.loads(line) for line in handle if line.strip()]
 
-    factors = []
-    for entry in records:
-        factor = parse_factors(entry)
-        if factor:
-            factors.append(factor)
+    # Try to detect grid type by checking first record
+    is_custom = False
+    if records:
+        first_factor = parse_factors(records[0])
+        if not first_factor:
+            # Check if it has messages (custom grid)
+            if records[0].get("messages"):
+                is_custom = True
 
-    if not factors:
+    prompts = []
+    prompt_id_map: dict = {}
+    
+    if is_custom:
+        # Custom grid (Dear Abby) - use messages directly
+        for entry in records:
+            custom_prompt = parse_custom_prompt(entry)
+            if custom_prompt:
+                prompts.append(custom_prompt)
+                prompt_id = entry.get("prompt_id")
+                if prompt_id:
+                    # Use prompt_id as key for custom prompts
+                    prompt_id_map[prompt_id] = prompt_id
+    else:
+        # Rent scenario grid - use Factors
+        for entry in records:
+            factor = parse_factors(entry)
+            if factor:
+                prompts.append(factor)
+                prompt_id = entry.get("prompt_id")
+                if prompt_id:
+                    from src.benchmark.core.types import make_prompt_id
+                    factor_key = make_prompt_id(factor)
+                    prompt_id_map[factor_key] = prompt_id
+
+    if not prompts:
         logger.error("Grid file %s does not contain any valid prompts.", path)
         sys.exit(1)
 
     if limit is None:
-        return factors
+        return prompts, prompt_id_map, is_custom
     if limit <= 0:
-        return []
-    return factors[:limit] if limit < len(factors) else factors
+        return [], prompt_id_map, is_custom
+    return prompts[:limit] if limit < len(prompts) else prompts, prompt_id_map, is_custom
 
 
 def show_run_header(
@@ -177,17 +253,153 @@ def main() -> None:
     if not args.dry_run:
         ensure_api_key(cfg)
 
-    run_timestamp = int(time.time())
-    run_dir, run_jsonl = resolve_run_paths(args.out, run_timestamp)
-    configure_logging(run_dir / "run.log")
-    logger = setup_logger("main")
-    models, model_configs = resolve_models(args, cfg)
+    all_models, model_configs = resolve_models(args, cfg)
     grid_path = Path(args.grid) if args.grid else DEFAULT_GRID_PATH
+    
+    # Filter models based on API key availability (like AI labeling)
+    from src.benchmark.providers.litellm_provider import _has_api_key_for_model
+    
+    models: list[str] = []
+    skipped_models: list[str] = []
+    for model_id in all_models:
+        if args.dry_run or _has_api_key_for_model(cfg, model_id):
+            models.append(model_id)
+        else:
+            skipped_models.append(model_id)
 
-    selected_factors = load_grid(grid_path, args.limit, logger)
+    # Set up logger first (needed for load_grid)
+    logger = setup_logger("main")
+    
+    # Load all prompts from grid to compute hash (before applying limit)
+    all_prompts, all_prompt_id_map, all_is_custom = load_grid(grid_path, None, logger)
+    
+    # Compute grid hash - different method for custom vs Factors grids
+    if all_is_custom:
+        # For custom grids, hash the prompt_ids
+        prompt_ids = sorted([p.get("prompt_id", "") for p in all_prompts])
+        canonical = json.dumps(prompt_ids, sort_keys=True, ensure_ascii=False)
+        grid_hash = hashlib.sha1(canonical.encode("utf-8")).hexdigest()[:16]
+    else:
+        from src.benchmark.core.types import compute_grid_hash
+        grid_hash = compute_grid_hash(all_prompts)
+    
+    # Now load selected prompts with limit
+    selected_prompts, prompt_id_map, is_custom = load_grid(grid_path, args.limit, logger)
+
+    run_dir, run_jsonl = resolve_run_paths(args.out, grid_hash)
+    configure_logging(run_dir / "run.log")
+    
+    # Copy grid.jsonl to run folder as source of truth for prompts
+    import shutil
+    grid_jsonl_dest = run_dir / "grid.jsonl"
+    if grid_path.exists() and not grid_jsonl_dest.exists():
+        shutil.copy2(grid_path, grid_jsonl_dest)
+        logger.info("Copied grid.jsonl to run folder: %s", grid_jsonl_dest)
+
+    # Show overview log (like AI labeling) - count completed tasks per model
+    from src.benchmark.core.types import RunRecord
+    from src.benchmark.core.logging import make_log_extra
+    
+    # Log skipped models (no API key)
+    if skipped_models:
+        logger.warning(
+            "",
+            extra=make_log_extra(
+                model=None,
+                grid=None,
+                task=None,
+                progress=None,
+                tag="warn",
+                status="no-key",
+                details=(f"count={len(skipped_models)}", ", ".join(skipped_models)),
+            ),
+        )
+    
+    plan_entries: list[dict[str, object]] = []
+    models_to_process: list[str] = []
+    total_prompts = len(selected_prompts)
+    
+    # Initialize completed_counts before the if block
+    completed_counts: dict[str, int] = {}
+    if run_jsonl.exists():
+        # Count completed tasks per model
+        try:
+            for record in RunRecord.iter_jsonl(run_jsonl):
+                if record.is_success() and record.model_id and record.prompt_id:
+                    completed_counts[record.model_id] = completed_counts.get(record.model_id, 0) + 1
+        except Exception as exc:
+            logger.warning("Error reading existing records for overview: %s", exc)
+    
+    for idx, model_id in enumerate(models, 1):
+        completed = completed_counts.get(model_id, 0)
+        pending = total_prompts - completed
+        todo = "OPEN" if pending > 0 else "DONE"
+        plan_entries.append(
+            {
+                "idx": idx,
+                "model": model_id,
+                "pending": pending,
+                "completed": completed,
+                "todo": todo,
+            }
+        )
+        if todo == "OPEN":
+            models_to_process.append(model_id)
+    
+    # Show overview
+    if plan_entries:
+        logger.info(
+            "",
+            extra=make_log_extra(
+                model=None,
+                grid=None,
+                task=None,
+                progress=None,
+                tag="info",
+                status="plan",
+                details=(
+                    f"total={len(plan_entries)}",
+                    f"open={len(models_to_process)}",
+                    f"done={len(plan_entries) - len(models_to_process)}",
+                ),
+            ),
+        )
+        for entry in plan_entries:
+            logger.info(
+                "",
+                extra=make_log_extra(
+                    model=str(entry["model"]),
+                    grid=None,
+                    task=None,
+                    progress=None,
+                    tag="info",
+                    status=str(entry["todo"]),
+                    details=(
+                        f"idx={entry['idx']}",
+                        f"todo={entry['todo']}",
+                        f"pending={entry['pending']}",
+                        f"completed={entry['completed']}",
+                    ),
+                ),
+            )
+    
+    if not models_to_process:
+        logger.info(
+            "All prompts already successfully completed for all models",
+            extra=make_log_extra(
+                model=None,
+                grid=None,
+                task=None,
+                progress=None,
+                tag="info",
+                status="plan",
+                details=("all-complete",),
+            ),
+        )
+        return
 
     show_run_header(
-        len(selected_factors),
+        len(selected_prompts),
         models,
         grid_path,
         logger,
@@ -195,17 +407,33 @@ def main() -> None:
     )
 
     t_start = time.time()
-    asyncio.run(
-        run_local_benchmark_async(
-            limit=len(selected_factors),
-            include_neutral=args.include_neutral,
-            factors_list_override=selected_factors,
-            assistant_models=models,
-            model_configs=model_configs,
-            out_path=run_jsonl,
-            dry_run=args.dry_run,
+    
+    if is_custom:
+        # Use custom grid runner for Dear Abby
+        from src.benchmark.run.runner_custom import run_custom_grid_async
+        asyncio.run(
+            run_custom_grid_async(
+                custom_prompts=selected_prompts,
+                assistant_models=models,
+                model_configs=model_configs,
+                out_path=run_jsonl,
+                dry_run=args.dry_run,
+                prompt_id_map=prompt_id_map,
+            )
         )
-    )
+    else:
+        # Use standard runner for rent scenario
+        asyncio.run(
+            run_local_benchmark_async(
+                limit=len(selected_prompts),
+                factors_list_override=selected_prompts,
+                assistant_models=models,
+                model_configs=model_configs,
+                out_path=run_jsonl,
+                dry_run=args.dry_run,
+                prompt_id_map=prompt_id_map,
+            )
+        )
     elapsed_s = time.time() - t_start
     wall_s = max(elapsed_s, 1e-6)
     logger.info("Benchmark generation finished in %.2fs", wall_s)
