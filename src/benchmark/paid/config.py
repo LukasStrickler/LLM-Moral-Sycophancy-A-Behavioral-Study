@@ -15,7 +15,7 @@ PromptId = NewType("PromptId", str)
 # Default configuration constants
 # For model selection rationale and grid composition, see SOTA_MODELS.md in this directory
 #
-# Sycophancy Benchmark Grid (15 models):
+# Sycophancy Benchmark Grid (16 models):
 # Comprehensive coverage across providers, architectures, and geographic origins
 # Includes historical models for generation-to-generation comparison
 # Note: openai/gpt-5 and openai/gpt-4o removed - we already have data for them
@@ -25,10 +25,11 @@ DEFAULT_MODELS: list[str] = [
     "anthropic/claude-sonnet-4.5",         # Best value - size comparison within family
     "anthropic/claude-sonnet-4",           # Previous generation Sonnet - historical comparison
     
-    # Google (3 models)
+    # Google (4 models)
     "google/gemini-3-pro-preview",         # Latest flagship - state-of-the-art multimodal
     "google/gemini-2.5-pro",               # Previous generation Pro - historical comparison
     "google/gemini-2.5-flash",             # Efficient workhorse - speed/cost balance
+    "google/gemma-3n-e4b-it",        # On-device optimized - mobile/edge AI, MatFormer architecture
     
     # OpenAI (2 models)
     "openai/gpt-5.1",                      # Latest iteration - mainstream commercial AI

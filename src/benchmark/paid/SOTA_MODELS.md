@@ -4,7 +4,7 @@ This document outlines the model selection strategy for the sycophancy behaviora
 
 ## Selected Model Grid
 
-The benchmark grid consists of 15 models, organized by provider:
+The benchmark grid consists of 16 models, organized by provider:
 
 **Note**: `openai/gpt-5` and `openai/gpt-4o` have been removed from the default grid as we already have comprehensive data for these models. They can still be run manually if needed for comparison.
 
@@ -15,10 +15,11 @@ SYCOPHANCY_BENCHMARK_GRID = [
     "anthropic/claude-sonnet-4.5",         # Best value - size comparison within family
     "anthropic/claude-sonnet-4",           # Previous generation Sonnet - historical comparison
     
-    # Google (3 models)
+    # Google (4 models)
     "google/gemini-3-pro-preview",         # Latest flagship - state-of-the-art multimodal
     "google/gemini-2.5-pro",               # Previous generation Pro - historical comparison
     "google/gemini-2.5-flash",             # Efficient workhorse - speed/cost balance
+    "google/gemma-3n-e4b-it",            # On-device optimized - mobile/edge AI, MatFormer architecture
     
     # OpenAI (2 models)
     "openai/gpt-5.1",                      # Latest iteration - mainstream commercial AI
@@ -126,6 +127,15 @@ Google's workhorse model, optimized for speed and efficiency while maintaining s
 
 Provides fast, efficient reasoning, a 1M token context window, represents Google's efficiency-focused approach, and enables comparison with the newer Gemini 3 Pro. The model includes built-in "thinking" capabilities configurable through parameters.
 
+### Google Gemma 3n E4B
+**ID**: `google/gemma-3n-e4b-it` | **Released**: November 2025
+
+Google's on-device optimized model built on the MatFormer architecture. Gemma 3n E4B operates at an effective 4B parameter size while leveraging an 8B architecture, enabling efficient execution on mobile and low-resource devices. The model supports multimodal inputs (text, vision, audio) and is used in production applications like PolicyBot and Google ML Kit for Android.
+
+For sycophancy research, this model provides insight into how sycophancy manifests in edge AI applications where privacy and offline capability are priorities. The on-device deployment context may reveal different interaction patterns compared to cloud-based models, making it valuable for understanding sycophancy across deployment architectures.
+
+Offers on-device optimization, MatFormer architecture with selective parameter activation, multimodal capabilities, real-world production deployment, 32K token context window, and represents Google's approach to edge AI. The model can run with as little as 3GB of memory and supports 140+ languages.
+
 ### OpenAI GPT-OSS-120B
 **ID**: `openai/gpt-oss-120b` | **Released**: August 2025
 
@@ -157,14 +167,14 @@ Offers a European AI perspective, strong multilingual capabilities, a different 
 ## Grid Composition Analysis
 
 ### Provider Distribution
-- **US Commercial Labs**: OpenAI (2), Anthropic (3), Google (3), Amazon (1), xAI (1), AllenAI (1) = 11 models
+- **US Commercial Labs**: OpenAI (2), Anthropic (3), Google (4), Amazon (1), xAI (1), AllenAI (1) = 12 models
 - **European Labs**: Mistral (1) = 1 model  
 - **Chinese Labs**: Moonshot (1), DeepSeek (1), Alibaba (1) = 3 models
 
 This distribution ensures coverage of all major AI development regions and approaches. The inclusion of multiple generations from OpenAI, Google, and Anthropic enables historical comparison. Amazon adds a major e-commerce/cloud provider perspective, while AllenAI adds open-source research perspective from a major US research institution.
 
 ### Model Type Distribution
-- **Proprietary Closed**: 8 models (Claude Opus 4.5, Gemini 3 Pro, GPT-5.1, Grok 4.1 Fast, Claude Sonnet 4.5, Claude Sonnet 4, Gemini 2.5 Flash, Qwen3-Max, Mistral Medium 3.1)
+- **Proprietary Closed**: 9 models (Claude Opus 4.5, Gemini 3 Pro, GPT-5.1, Grok 4.1 Fast, Claude Sonnet 4.5, Claude Sonnet 4, Gemini 2.5 Flash, Gemma 3n E4B, Qwen3-Max, Mistral Medium 3.1)
 - **Proprietary Open-Weight**: 1 model (GPT-OSS-120B)
 - **Open-Source**: 3 models (DeepSeek R1, Kimi K2 Thinking, Olmo 3 32B Think)
 
@@ -173,19 +183,19 @@ The mix of proprietary and open-source models allows comparison of how transpare
 ### Cost and Size Distribution
 - **Large/Expensive**: Claude Opus 4.5, Gemini 3 Pro, GPT-5.1, Qwen3-Max (4 models)
 - **Medium/Moderate**: Claude Sonnet 4.5, Claude Sonnet 4, Gemini 2.5 Flash, Mistral Medium 3.1 (4 models)
-- **Efficient/Low-Cost**: GPT-OSS-120B, DeepSeek R1, Grok 4.1 Fast (free), Kimi K2 Thinking (4 models)
+- **Efficient/Low-Cost**: GPT-OSS-120B, DeepSeek R1, Grok 4.1 Fast (free), Kimi K2 Thinking, Gemma 3n E4B (5 models)
 
 This distribution enables analysis of how model size and cost correlate with sycophancy patterns.
 
 ### Reasoning Capability Distribution
 - **Strong Reasoning Models**: Claude Opus 4.5, Kimi K2 Thinking, DeepSeek R1, GPT-OSS-120B, Olmo 3 32B Think (5 models)
-- **Standard Reasoning Models**: All other models with varying reasoning strengths (9 models)
+- **Standard Reasoning Models**: All other models with varying reasoning strengths (10 models)
 
 The inclusion of both strong reasoning models and standard models allows investigation of whether reasoning capability affects sycophancy.
 
-## Why Fifteen Models?
+## Why Sixteen Models?
 
-Fifteen models provide sufficient statistical power for comparative analysis while remaining computationally and financially feasible. This number enables:
+Sixteen models provide sufficient statistical power for comparative analysis while remaining computationally and financially feasible. This number enables:
 
 1. **Statistical Significance**: Enough models to identify patterns, correlations, and outliers across different model characteristics
 2. **Provider Coverage**: At least one model from each major provider, with multiple models from the largest providers for within-provider comparison
@@ -197,11 +207,11 @@ Fifteen models provide sufficient statistical power for comparative analysis whi
 
 ### Running the Benchmark
 
-Execute the benchmark with all 15 default models:
+Execute the benchmark with all 16 default models:
 
 ```bash
 poetry run python scripts/run_paid_benchmark.py \
-  --models anthropic/claude-opus-4.5,anthropic/claude-sonnet-4.5,anthropic/claude-sonnet-4,google/gemini-3-pro-preview,google/gemini-2.5-pro,google/gemini-2.5-flash,openai/gpt-5.1,openai/gpt-oss-120b,amazon/nova-premier-v1,allenai/olmo-3-32b-think,x-ai/grok-4.1-fast:free,moonshotai/kimi-k2-thinking,deepseek/deepseek-r1,qwen/qwen3-max,mistralai/mistral-medium-3.1 \
+  --models anthropic/claude-opus-4.5,anthropic/claude-sonnet-4.5,anthropic/claude-sonnet-4,google/gemini-3-pro-preview,google/gemini-2.5-pro,google/gemini-2.5-flash,google/gemma-3n-e4b-it,openai/gpt-5.1,openai/gpt-oss-120b,amazon/nova-premier-v1,allenai/olmo-3-32b-think,x-ai/grok-4.1-fast:free,moonshotai/kimi-k2-thinking,deepseek/deepseek-r1,qwen/qwen3-max,mistralai/mistral-medium-3.1 \
   --budget 20.0 \
   --prompt-limit 10
 ```
