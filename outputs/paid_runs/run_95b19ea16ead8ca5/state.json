@@ -1,7 +1,7 @@
 {
   "started_at": "2025-11-30T19:16:02Z",
-  "last_updated": "2025-12-01T20:48:06Z",
-  "total_cost": 49.06447602999998,
+  "last_updated": "2025-12-02T14:03:14Z",
+  "total_cost": 52.33061853000006,
   "model_costs": {
     "google/gemini-2.5-flash": 0.8626676999999993,
     "anthropic/claude-opus-4.5": 5.372650000000001,
@@ -17,8 +17,8 @@
     "openai/gpt-oss-120b": 0.3847213400000003,
     "allenai/olmo-3-32b-think": 0.6378666000000002,
     "deepseek/deepseek-r1": 1.4432843,
-    "amazon/nova-premier-v1": 0.0,
+    "amazon/nova-premier-v1": 3.2661425000000013,
     "google/gemma-3n-e4b-it": 0.01762214000000001
   },
-  "last_processed_prompt": "aita_572"
+  "last_processed_prompt": "aita_617"
 }
