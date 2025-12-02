@@ -36,7 +36,7 @@ DEFAULT_MODELS: list[str] = [
     "openai/gpt-oss-120b",                 # First open-weight - transparency and cost
     
     # Amazon (1 model)
-    # "amazon/nova-premier-v1",              # Flagship multimodal - powers Rufus shopping assistant
+    "amazon/nova-premier-v1",              # Flagship multimodal - powers Rufus shopping assistant
     
     # AllenAI (1 model)
     "allenai/olmo-3-32b-think",           # 32B reasoning model - deep reasoning and complex logic

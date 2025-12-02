@@ -1,5 +1,6 @@
 model_id,Prompts_Answered,Avg_Latency_ms,Median_Latency_ms,Avg_Tokens,Total_Tokens,Total_Cost_USD,Avg_Cost_USD,Avg_Response_Length,Completion_Rate_%
 allenai/olmo-3-32b-think,500,62221.73,56183.5,2529.98,1264992,0.64,0.0,4589.16,100.0
+amazon/nova-premier-v1,494,22147.74,21703.0,902.2,445689,3.27,0.01,2186.57,98.8
 anthropic/claude-opus-4.5,500,11057.31,10461.5,784.53,392266,5.37,0.01,1468.1,100.0
 anthropic/claude-sonnet-4,500,10337.63,10148.5,748.26,374128,2.95,0.01,1393.42,100.0
 anthropic/claude-sonnet-4.5,500,11918.36,11642.0,803.86,401931,3.37,0.01,1528.27,100.0

@@ -8,6 +8,85 @@ The benchmark grid consists of 16 models, organized by provider:
 
 **Note**: `openai/gpt-5` and `openai/gpt-4o` have been removed from the default grid as we already have comprehensive data for these models. They can still be run manually if needed for comparison.
 
+### Model Family Visualization
+
+**16 SOTA Models - Categorized by Purpose & Characteristics**
+
+```mermaid
+%%{init: { "theme": "base", "themeVariables": { "primaryColor": "#E8F5E9", "primaryTextColor": "#1B5E20", "primaryBorderColor": "#43A047", "lineColor": "transparent", "secondaryColor": "#E3F2FD", "tertiaryColor": "#FFF8E1" }, "flowchart": { "useMaxWidth": true, "htmlLabels": true, "curve": "basis" } } }%%
+flowchart
+    subgraph MAIN["16 Models"]
+        subgraph FLAGSHIP["🏆 Flagship (5)"]
+            direction LR
+            F1["Claude Opus 4.5<br/>Anthropic (US)<br/>[Strongest alignment]"]:::flagship
+            F2["Gemini 3 Pro Preview<br/>Google (US)<br/>[Multimodal reasoning]"]:::flagship
+            F3["GPT-5.1<br/>OpenAI (US)<br/>[Mainstream commercial]"]:::flagship
+            F4["Qwen3-Max<br/>Alibaba (CH)<br/>[Outperforms Western]"]:::flagship
+            F5["Mistral Medium 3.1<br/>Mistral (EU)<br/>[European perspective]"]:::flagship
+        end
+        
+        subgraph OPENSOURCE["🔓 OpenSource (4)"]
+            direction LR
+            O1["DeepSeek R1<br/>DeepSeek (CH)<br/>[MIT licensed]"]:::opensource
+            O2["Olmo 3 32B Think<br/>AllenAI (US)<br/>[Apache 2.0]"]:::opensource
+            O3["GPT-OSS-120B<br/>OpenAI (US)<br/>[First OpenAI open]"]:::opensource
+            O4["Kimi K2 Thinking<br/>Moonshot (CH)<br/>[Trillion-param]"]:::opensource
+        end
+
+        subgraph SPECIALIZED["🎯 Specialized (3)"]
+            direction LR
+            S1["Grok 4.1 Fast<br/>xAI (US)<br/>[Philophy/Social Media]"]:::specialized
+            S2["Gemma 3n E4B<br/>Google (US)<br/>[On-device, Edge AI]"]:::specialized
+            S3["Nova Premier v1<br/>Amazon (US)<br/>[E-commerce, Rufus]"]:::specialized
+        end
+        
+        subgraph EFFICIENT["⚡ Efficient (2)"]
+            direction LR
+            E1["Gemini 2.5 Flash<br/>Google (US)<br/>[Speed/cost balance]"]:::efficient
+            E2["Claude Sonnet 4.5<br/>Anthropic (US)<br/>[Performance/price]"]:::efficient
+        end
+        
+
+        
+        subgraph HISTORICAL["📜 Historical (2)"]
+            direction LR
+            H1["Claude Sonnet 4<br/>Anthropic (US)<br/>[Anthropic baseline]"]:::historical
+            H2["Gemini 2.5 Pro<br/>Google (US)<br/>[Google baseline]"]:::historical
+        end
+    end
+    
+    FLAGSHIP ~~~ OPENSOURCE
+    OPENSOURCE ~~~ SPECIALIZED
+    SPECIALIZED ~~~ EFFICIENT
+    SPECIALIZED ~~~ HISTORICAL
+    
+    classDef flagship fill:#FFE082,stroke:#F57C00,stroke-width:2px
+    classDef opensource fill:#C5E1A5,stroke:#558B2F,stroke-width:2px
+    classDef efficient fill:#BBDEFB,stroke:#1976D2,stroke-width:2px
+    classDef specialized fill:#F8BBD0,stroke:#C2185B,stroke-width:2px
+    classDef historical fill:#E1BEE7,stroke:#7B1FA2,stroke-width:2px
+    
+    style MAIN fill:transparent,stroke:transparent
+```
+
+**Legend:**
+- 🏆 **Flagship**: Latest top-tier models from major providers across regions (US, China, EU SOTA)
+- 🔓 **OpenSource**: Open-weight or open-source models (transparency & reproducibility)
+- ⚡ **Efficient**: Cost-effective models optimized for speed/price balance
+- 🎯 **Specialized**: Models designed for specific deployment contexts (on-device, e-commerce)
+- 📜 **Historical**: Previous generation models (enables temporal comparison)
+
+**Selection Rationale:**
+
+The 16 models were selected to provide comprehensive coverage across:
+- **Geographic Diversity**: US (12), Chinese (3), European (1) labs
+- **Transparency Spectrum**: Proprietary (9), Open-weight (1), Open-source (4)
+- **Use Cases**: Flagship performance, reasoning capabilities, efficiency, specialization
+- **Temporal Analysis**: Current generation + historical baselines for evolution tracking
+- **Statistical Power**: Sufficient sample size for comparative analysis while remaining cost-effective
+
+This distribution enables investigation of how sycophancy manifests across different training paradigms, cultural contexts, transparency levels, and deployment scenarios.
+
 ```python
 SYCOPHANCY_BENCHMARK_GRID = [
     # Anthropic (3 models)
@@ -49,23 +128,29 @@ SYCOPHANCY_BENCHMARK_GRID = [
 ### Anthropic Claude Opus 4.5
 **ID**: `anthropic/claude-opus-4.5` | **Released**: November 24, 2025
 
-Anthropic's strongest model represents the current state-of-the-art in alignment and safety-focused training. Claude models are recognized for nuanced handling of ethical dilemmas and strong instruction-following. Opus 4.5 achieved 80.9% on SWE-Bench Verified, demonstrating exceptional reasoning capabilities.
+**Lab/Provider**: Anthropic is a leading US AI safety company known for its focus on alignment research and safety-first development. As one of the major US commercial labs, Anthropic brings a distinct perspective on AI development with emphasis on constitutional AI and safety training.
 
-For sycophancy research, this model provides a baseline for how highly-aligned models respond to user preferences. It offers strong ethical reasoning, robust alignment training, and the ability to follow nuanced instructions while maintaining principled positions.
+**Model Rationale**: Opus 4.5 is Anthropic's strongest model and represents the current state-of-the-art in alignment and safety-focused training. Claude models are recognized for nuanced handling of ethical dilemmas and strong instruction-following. Opus 4.5 achieved 80.9% on SWE-Bench Verified, demonstrating exceptional reasoning capabilities.
+
+**For Sycophancy Research**: This model provides a baseline for how highly-aligned models respond to user preferences. It offers strong ethical reasoning, robust alignment training, and the ability to follow nuanced instructions while maintaining principled positions, making it valuable for understanding how safety-focused training affects sycophancy behavior.
 
 ### Google Gemini 3 Pro Preview
 **ID**: `google/gemini-3-pro-preview` | **Released**: November 18, 2025
 
-Google's latest flagship model, released days before Claude Opus 4.5. Gemini 3 Pro outperformed GPT-5.1 and Claude Sonnet 4.5 across multiple benchmarks, including leading scores on LMArena, GPQA Diamond, and MathArena Apex. This represents Google's approach to multimodal reasoning and agentic capabilities.
+**Lab/Provider**: Google is a major US tech company and one of the largest AI research organizations. Google brings extensive resources, multimodal capabilities, and a different training philosophy compared to OpenAI and Anthropic, representing another major US commercial lab perspective.
 
-Provides state-of-the-art multimodal reasoning, strong performance on complex benchmarks, and insight into Google's latest training methodology. The preview status indicates this is Google's most recent architecture.
+**Model Rationale**: Gemini 3 Pro is Google's latest flagship model, released days before Claude Opus 4.5. It outperformed GPT-5.1 and Claude Sonnet 4.5 across multiple benchmarks, including leading scores on LMArena, GPQA Diamond, and MathArena Apex. This represents Google's approach to multimodal reasoning and agentic capabilities.
+
+**For Sycophancy Research**: Provides state-of-the-art multimodal reasoning, strong performance on complex benchmarks, and insight into Google's latest training methodology. The preview status indicates this is Google's most recent architecture, enabling analysis of how Google's multimodal and agentic training affects sycophancy patterns.
 
 ### OpenAI GPT-5.1
 **ID**: `openai/gpt-5.1` | **Released**: November 13, 2025
 
-OpenAI's most recent model iteration builds on GPT-5 with enhanced reasoning and coding capabilities. GPT-5.1 represents OpenAI's continued evolution in instruction-following and safety. As one of the most widely-adopted API models, understanding its sycophancy behavior is critical for real-world impact assessment.
+**Lab/Provider**: OpenAI is a leading US AI research company and one of the most influential in the field. As the creator of GPT models and a major commercial AI provider, OpenAI represents mainstream commercial AI deployment and has shaped industry standards for instruction-following and safety.
 
-Offers the latest OpenAI methodology, strong coding and reasoning capabilities, and represents mainstream commercial AI deployment patterns.
+**Model Rationale**: GPT-5.1 is OpenAI's most recent model iteration, building on GPT-5 with enhanced reasoning and coding capabilities. It represents OpenAI's continued evolution in instruction-following and safety. As one of the most widely-adopted API models, understanding its sycophancy behavior is critical for real-world impact assessment.
+
+**For Sycophancy Research**: Offers the latest OpenAI methodology, strong coding and reasoning capabilities, and represents mainstream commercial AI deployment patterns. This enables investigation of sycophancy in the most widely-used commercial AI systems.
 
 ### Amazon Nova Premier v1
 **ID**: `amazon/nova-premier-v1` | **Released**: November 2025
@@ -153,16 +238,20 @@ Offers open-source reasoning (MIT licensed), strong performance, Chinese trainin
 ### Alibaba Qwen3-Max
 **ID**: `qwen/qwen3-max` | **Released**: September 5, 2025
 
-Alibaba's flagship model that outperforms other foundation models including Qwen3-235B, Kimi K2, Claude 4 Opus Non-thinking, and DeepSeek V3.1. Qwen models represent a major Chinese AI lab's approach to large-scale model training. Including Qwen3-Max provides coverage of another major Chinese provider with different training data and potentially different alignment objectives.
+**Lab/Provider**: Alibaba is a major Chinese tech company and one of the largest AI research organizations in China. As a Chinese lab, Alibaba brings different cultural contexts, training data, and potentially different alignment objectives compared to US and European labs, providing important geographic diversity.
 
-Offers a strong Chinese model, outperforms many Western models on benchmarks, represents Alibaba's training approach, and provides important geographic diversity. The model supports reasoning capabilities that can be enabled or disabled.
+**Model Rationale**: Qwen3-Max is Alibaba's flagship model that outperforms other foundation models including Qwen3-235B, Kimi K2, Claude 4 Opus Non-thinking, and DeepSeek V3.1. Qwen models represent a major Chinese AI lab's approach to large-scale model training with different methodologies and objectives.
+
+**For Sycophancy Research**: Offers a strong Chinese model, outperforms many Western models on benchmarks, represents Alibaba's training approach, and provides important geographic diversity. The model supports reasoning capabilities that can be enabled or disabled, enabling investigation of how Chinese training approaches and cultural contexts affect sycophancy behavior.
 
 ### Mistral Medium 3.1
 **ID**: `mistralai/mistral-medium-3.1` | **Released**: October 30, 2025
 
-Mistral represents European AI development and offers a different perspective from US-based labs (OpenAI, Anthropic, Google) and Chinese labs. Mistral models are known for their efficiency and strong performance on European languages and contexts. Medium 3.1 is their latest iteration, providing a European perspective on alignment and instruction-following.
+**Lab/Provider**: Mistral AI represents European AI development and offers a different perspective from US-based labs (OpenAI, Anthropic, Google) and Chinese labs. As a European lab, Mistral brings geographic and cultural diversity to the benchmark, representing the third major AI development region alongside US and Chinese labs.
 
-Offers a European AI perspective, strong multilingual capabilities, a different alignment approach, and represents the third major geographic region in our analysis.
+**Model Rationale**: Mistral Medium 3.1 is Mistral's flagship model and represents European SOTA capabilities. Mistral models are known for their efficiency and strong performance on European languages and contexts. Medium 3.1 is their latest iteration, providing a European perspective on alignment and instruction-following that may differ from US or Chinese approaches.
+
+**For Sycophancy Research**: Offers a European AI perspective, strong multilingual capabilities, a different alignment approach, and represents the third major geographic region in our analysis. This enables investigation of whether cultural and regional training differences affect sycophancy patterns.
 
 ## Grid Composition Analysis
 
