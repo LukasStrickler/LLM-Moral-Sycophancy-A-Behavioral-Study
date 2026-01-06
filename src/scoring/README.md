@@ -44,4 +44,3 @@ Scores are mapped to discrete categories for reporting:
 
 - `src/benchmark/scoring/master.py`: Current master model scorer
 - `src/benchmark/scoring/metrics.py`: Score-to-stance mapping
-- `slurm/job_train_roberta.sbatch`: Future training job script

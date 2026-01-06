@@ -13,7 +13,7 @@ The benchmark grid consists of 16 models, organized by provider:
 **16 SOTA Models - Categorized by Purpose & Characteristics**
 
 ```mermaid
-%%{init: { "theme": "base", "themeVariables": { "primaryColor": "#E8F5E9", "primaryTextColor": "#1B5E20", "primaryBorderColor": "#43A047", "lineColor": "transparent", "secondaryColor": "#E3F2FD", "tertiaryColor": "#FFF8E1" }, "flowchart": { "useMaxWidth": true, "htmlLabels": true, "curve": "basis" } } }%%
+%%{init: { "theme": "base", "themeVariables": { "primaryColor": "#E8F5E9", "primaryTextColor": "", "primaryBorderColor": "#43A047", "lineColor": "transparent", "secondaryColor": "#E3F2FD", "tertiaryColor": "#FFF8E1" }, "flowchart": { "useMaxWidth": true, "htmlLabels": true, "curve": "basis" } } }%%
 flowchart
     subgraph MAIN["16 Models"]
         subgraph FLAGSHIP["🏆 Flagship (5)"]
@@ -21,16 +21,16 @@ flowchart
             F1["Claude Opus 4.5<br/>Anthropic (US)<br/>[Strongest alignment]"]:::flagship
             F2["Gemini 3 Pro Preview<br/>Google (US)<br/>[Multimodal reasoning]"]:::flagship
             F3["GPT-5.1<br/>OpenAI (US)<br/>[Mainstream commercial]"]:::flagship
-            F4["Qwen3-Max<br/>Alibaba (CH)<br/>[Outperforms Western]"]:::flagship
+            F4["Qwen3-Max (>1T)<br/>Alibaba (CH)<br/>[Outperforms Western]"]:::flagship
             F5["Mistral Medium 3.1<br/>Mistral (EU)<br/>[European perspective]"]:::flagship
         end
         
         subgraph OPENSOURCE["🔓 OpenSource (4)"]
             direction LR
-            O1["DeepSeek R1<br/>DeepSeek (CH)<br/>[MIT licensed]"]:::opensource
+            O1["DeepSeek R1 (671B)<br/>DeepSeek (CH)<br/>[MIT licensed]"]:::opensource
             O2["Olmo 3 32B Think<br/>AllenAI (US)<br/>[Apache 2.0]"]:::opensource
             O3["GPT-OSS-120B<br/>OpenAI (US)<br/>[First OpenAI open]"]:::opensource
-            O4["Kimi K2 Thinking<br/>Moonshot (CH)<br/>[Trillion-param]"]:::opensource
+            O4["Kimi K2 Thinking (1T)<br/>Moonshot (CH)<br/>[Strongest open-source]"]:::opensource
         end
 
         subgraph SPECIALIZED["🎯 Specialized (3)"]
@@ -46,7 +46,6 @@ flowchart
             E2["Claude Sonnet 4.5<br/>Anthropic (US)<br/>[Performance/price]"]:::efficient
         end
         
-
         
         subgraph HISTORICAL["📜 Historical (2)"]
             direction LR
