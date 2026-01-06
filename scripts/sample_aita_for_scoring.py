@@ -2,7 +2,8 @@
 """Sample ~1000 AITA responses for scoring, excluding existing seed records.
 
 This script:
-1. Loads existing AITA seed files (aita_seed.jsonl and aita_seed_v2.jsonl) to identify already-sampled records
+1. Loads existing AITA seed files (aita_seed.jsonl and aita_seed_v2.jsonl)
+   to identify already-sampled records
 2. Loads compiled AITA outputs CSV
 3. Filters out records that match existing identifiers
 4. Performs stratified sampling across models and scenarios
@@ -12,13 +13,10 @@ This script:
 from __future__ import annotations
 
 import json
-import random
 import sys
-from collections import Counter, defaultdict, deque
+from collections import defaultdict, deque
 from pathlib import Path
-from typing import Deque, Dict, List, Set, Tuple
 
-import numpy as np
 import pandas as pd
 
 # Add project root to path
@@ -43,14 +41,14 @@ DEFAULT_TOPIC = "general"
 SEED_RUN_ID = "scoring-run-v1"
 
 
-def load_existing_seed_identifiers(seed_file: Path) -> Set[str]:
+def load_existing_seed_identifiers(seed_file: Path) -> set[str]:
     """Load identifiers from existing seed file to exclude from new sample."""
     if not seed_file.exists():
         print(f"Warning: Existing seed file not found: {seed_file}")
         return set()
 
     identifiers = set()
-    with open(seed_file, "r", encoding="utf-8") as f:
+    with open(seed_file, encoding="utf-8") as f:
         for line in f:
             if line.strip():
                 try:
@@ -105,7 +103,7 @@ def build_prompt_title(row: pd.Series) -> str:
     return f"R: {reddit_label} AI: {model_label}"
 
 
-def build_metadata(_: pd.Series) -> Dict[str, str]:
+def build_metadata(_: pd.Series) -> dict[str, str]:
     """Build metadata dict."""
     return {
         "source": DEFAULT_SOURCE,
@@ -114,7 +112,7 @@ def build_metadata(_: pd.Series) -> Dict[str, str]:
     }
 
 
-def _build_quota(items: List[int | str], total: int) -> Dict[int | str, int]:
+def _build_quota(items: list[int | str], total: int) -> dict[int | str, int]:
     """Build quota dictionary distributing total across items."""
     base, remainder = divmod(total, len(items))
     quota = {item: base for item in items}
@@ -124,10 +122,10 @@ def _build_quota(items: List[int | str], total: int) -> Dict[int | str, int]:
 
 
 def _prepare_model_scenarios(
-    frame: pd.DataFrame, models: List[str], random_state: int
-) -> Dict[str, Deque[int]]:
+    frame: pd.DataFrame, models: list[str], random_state: int
+) -> dict[str, deque[int]]:
     """Prepare deque of scenarios per model, shuffled with different seeds."""
-    lookup: Dict[str, Deque[int]] = {}
+    lookup: dict[str, deque[int]] = {}
     for offset, model in enumerate(models):
         scenarios = (
             frame.loc[frame["model_name"] == model, "scenario_number"]
@@ -141,9 +139,9 @@ def _prepare_model_scenarios(
 
 def _index_rows_by_model_and_scenario(
     frame: pd.DataFrame,
-) -> Dict[Tuple[str, int], List[int]]:
+) -> dict[tuple[str, int], list[int]]:
     """Index rows by (model_name, scenario_number) -> list of row indices."""
-    index: Dict[Tuple[str, int], List[int]] = defaultdict(list)
+    index: dict[tuple[str, int], list[int]] = defaultdict(list)
     for idx, row in frame.iterrows():
         index[(row["model_name"], int(row["scenario_number"]))].append(idx)
     return index
@@ -153,7 +151,7 @@ def sample_balanced_models_and_scenarios_dual_quota(
     frame: pd.DataFrame,
     total_n: int,
     random_state: int,
-    exclude_identifiers: Set[str],
+    exclude_identifiers: set[str],
 ) -> pd.DataFrame:
     """Select rows balancing quotas across model_name and scenario_number.
 
@@ -202,7 +200,7 @@ def sample_balanced_models_and_scenarios_dual_quota(
     model_to_scenarios = _prepare_model_scenarios(frame, models, random_state)
     row_lookup = _index_rows_by_model_and_scenario(frame)
 
-    picked_indices: List[int] = []
+    picked_indices: list[int] = []
     model_idx = 0
 
     def select_scenario(model: str, enforce_quota: bool) -> int | None:
@@ -281,9 +279,10 @@ def export_to_jsonl(df: pd.DataFrame, output_path: Path) -> None:
             # Ensure metadata is a dict (not string)
             if isinstance(record.get("metadata"), str):
                 try:
-                    record["metadata"] = json.loads(record["metadata"])
+                    metadata = json.loads(record["metadata"])
                 except json.JSONDecodeError:
-                    pass
+                    metadata = record["metadata"]
+                record["metadata"] = metadata
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
     print(f"Exported {len(records)} records to {output_path}")
@@ -335,7 +334,7 @@ def main() -> None:
     print("Step 3: Sampling new records (excluding all existing)...")
     print(f"Target sample size: {TARGET_SAMPLE_SIZE}")
     print(f"Random state: {RANDOM_STATE}")
-    print(f"Using dual-quota algorithm")
+    print("Using dual-quota algorithm")
     print()
 
     sample_df = sample_balanced_models_and_scenarios_dual_quota(
