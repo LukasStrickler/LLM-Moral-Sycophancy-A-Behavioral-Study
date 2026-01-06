@@ -218,3 +218,9 @@ logs/
 *.sqlite
 *.sqlite3
 
+paper/
+
+# AI Agent documentation (auto-generated)
+AGENTS.md
+**/AGENTS.md
+.ada/

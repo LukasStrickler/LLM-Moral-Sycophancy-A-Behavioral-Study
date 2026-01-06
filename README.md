@@ -77,11 +77,6 @@ LLM-Moral-Sycophancy-A-Behavioral-Study/
 │   ├── data_portal.py          # Manage labeling platform data
 │   └── [README.md](scripts/README.md)
 │
-├── slurm/                       # HPC cluster job scripts
-│   ├── [README.md](slurm/README.md)               # Slurm usage guide
-│   ├── job_benchmark.sbatch    # Benchmark job script
-│   └── job_train_roberta.sbatch # ModernBERT training job script
-│
 └── outputs/                     # Generated results
     ├── raw/                    # Raw benchmark grids
     └── runs/                   # Individual run results
@@ -103,7 +98,6 @@ Quick access to all project documentation:
 - **[Labeling Platform](src/labeling_app/README.md)** - Human labeling platform architecture and usage
 - **[Human Labeling Data](data/humanLabel/README.md)** - Data lifecycle and file formats
 - **[Prompt Templates](data/prompts/README.md)** - Prompt generation and scenario templates
-- **[HPC Cluster Usage](slurm/README.md)** - Slurm job scripts and cluster configuration
 - **[ML Scoring Models](src/scoring/README.md)** - ModernBERT scoring model implementation
 
 ### Quick Links
@@ -119,12 +113,12 @@ We follow two flows: training a ModernBERT regression model on 200 human‑label
 %%{init: { "theme": "neutral" }}%%
 flowchart TD
   subgraph TRAINING[Model Training]
-    T1["Data Collection<br/>(200 Reddit AITA prompts<br/>× old models)"]:::data --> T2["Human Labeling<br/>(Streamlit, scale -1..1)"]:::human
-    T2 --> T3["Model Training<br/>(ModernBERT regression)"]:::model
+    T1["Data Collection<br/>(200 Reddit AITA prompts<br/>× old models)"]:::data -- 300 Responses --> T2["Human Labeling<br/>(Streamlit, scale -1..1)"]:::human
+    T2 -- 85/15 Train/Test Split --> T3["Model Training<br/>(ModernBERT regression)"]:::model
   end
 
   subgraph EVALUATION[Evaluation]
-    E1["Data Collection<br/>(500 Reddit AITA prompts<br/>× SOTA models)"]:::data --> E2["Scoring<br/>(ModernBERT inference)"]:::model
+    E1["Data Collection<br/>(500 Reddit AITA prompts<br/>× EVAL models)"]:::data --> E2["Scoring<br/>(ModernBERT inference)"]:::model
     E2 --> E3["Human Audit<br/>(sample relabel)"]:::human
     E3 --> E4["Analysis<br/>(human vs model)"]:::eval
   end
@@ -332,29 +326,6 @@ The CLI orchestrates the full labeling data flow:
 
 Additional details live in [src/labeling_app/README.md](src/labeling_app/README.md) and
 [scripts/README.md](scripts/README.md).
-
-## 🖥️ HPC Cluster Usage (Slurm) - WIP
-
-For running on University of Mannheim or KIT clusters, see the [HPC Guide](slurm/README.md).
-
-**Status**: Work in Progress - Slurm integration will be implemented in a future milestone.
-
-### Current Status
-- Job scripts are placeholders
-- Cluster configuration pending
-- Use local execution for now
-
-### Future Implementation
-```bash
-# Run benchmark (CPU) - Coming Soon
-sbatch slurm/job_benchmark.sbatch
-
-# Score responses (CPU) - Coming Soon
-sbatch slurm/job_eval.sbatch
-
-# Train ModernBERT scorer (GPU) - Coming Soon  
-sbatch slurm/job_train_roberta.sbatch
-```
 
 ## 📊 Understanding Outputs
 
