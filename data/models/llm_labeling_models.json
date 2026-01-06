@@ -36,6 +36,12 @@
     "concurrency": 3
   },
   {
+    "id": "openrouter/google/gemini-2.0-flash-lite-001",
+    "label": "Gemini 2.0 Flash Lite 001 (OpenRouter)",
+    "provider": "OpenRouter",
+    "concurrency": 3
+  },
+  {
     "id": "groq/llama-3.3-70b-versatile",
     "label": "Llama 3.3 70B Versatile (Groq)",
     "provider": "Groq",

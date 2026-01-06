@@ -34,6 +34,9 @@ class ProviderConfig:
 
     @staticmethod
     def from_env() -> ProviderConfig:
+        # Prefer PAID_OPENROUTER_API_KEY for paid models, fall back to OPENROUTER_API_KEY
+        openrouter_key = os.getenv("PAID_OPENROUTER_API_KEY") or os.getenv("OPENROUTER_API_KEY")
+        
         return ProviderConfig(
             google_ai_api_key=os.getenv("GOOGLE_AI_API_KEY"),
             groq_api_key=os.getenv("GROQ_API_KEY"),
@@ -41,7 +44,7 @@ class ProviderConfig:
             cerebras_api_key=os.getenv("CEREBRAS_API_KEY"),
             mistral_api_key=os.getenv("MISTRAL_API_KEY"),
             cohere_api_key=os.getenv("COHERE_API_KEY"),
-            openrouter_api_key=os.getenv("OPENROUTER_API_KEY"),
+            openrouter_api_key=openrouter_key,
             model=os.getenv("LLM_MODEL"),
             scorer_model=os.getenv("LLM_SCORER_MODEL"),
         )

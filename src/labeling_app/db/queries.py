@@ -477,7 +477,7 @@ def get_unlabeled_responses(
         FROM llm_responses AS responses
         LEFT JOIN reviews ON reviews.llm_response_id = responses.id AND reviews.reviewer_code = ?
         WHERE responses.dataset = ? AND reviews.id IS NULL
-        ORDER BY responses.created_at ASC
+        ORDER BY responses.id ASC
     """
 
     params = [reviewer_code, dataset.value]
