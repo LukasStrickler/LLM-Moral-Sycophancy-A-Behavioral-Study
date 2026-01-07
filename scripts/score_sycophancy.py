@@ -1,6 +1,14 @@
+"""
+Trains a regression model (ModernBERT) to predict consensus scores from model responses. 
+Includes logic for handling imbalanced data via upsampling, optional Optuna hyperparameter optimization (with K-Fold support), 
+and generates detailed performance metrics per LLM model.
+"""
+
 import os
 import time
-# DISABLE DYNAMO TO FIX "FX symbolically trace" ERROR
+
+# Dynamo triggers an FX symbolic trace error with this setup, so we're disabling it 
+# to ensure the training loop runs stable.
 os.environ["PYTORCH_ENABLE_TORCHDYNAMO"] = "0"
 os.environ["TORCH_COMPILE_DISABLE"] = "1" 
 
@@ -25,7 +33,7 @@ import numpy as np
 import warnings
 import optuna
 
-# Optional: Optuna transformers pruning callback
+# Grab the pruning callback if Optuna is available, otherwise skip it.
 try:
     from optuna.integration import TransformersPruningCallback
     _HAS_TRANSFORMERS_PRUNING = True
@@ -36,71 +44,66 @@ warnings.filterwarnings("ignore", category=FutureWarning, message=".*is deprecat
 warnings.filterwarnings("ignore", message="Was asked to gather along dimension 0, but all input tensors were scalars*")
 
 
-# =================================================
-#              CONSOLIDATED USER CONFIGURATION
-# =================================================
+# --- Global Configuration ---
 
-# File paths
 TRAIN_CSV_PATH = "training_data.csv"
 VAL_CSV_PATH = "validation_data.csv"
 MODEL_PATH = "answerdotai/ModernBERT-base"
 OUTPUT_DIR = "./modernbert_chosen_consensus_advanced"
 
-# ====== EXECUTION MODE (Toggle here) ======
-RUN_SINGLE_MODEL = False                 # True: Single model | False: Optuna hyperparameter search
-use_upsampling_grid = False              # True: Grid of upsampling configs | False: Single upsampling config
-use_kfold = False                         # True: k-fold CV for Optuna | False: simple train/val split
-optuna_prune = False                      # True: Enable Optuna pruning | False: Disable pruning
+# Toggles for the run mode
+RUN_SINGLE_MODEL = True                 # Set to False to run the full Optuna search
+use_upsampling_grid = False             # Set to True to iterate through the UPSAMPLING_GRID list
+use_kfold = False                         
+optuna_prune = False                      
 
-# ====== DATA INPUT CONFIGURATION (Toggle here) ======
-USE_PROMPTS = False                      # True: Use 'prompt_body' + 'model_response_text' | False: Only 'model_response_text'
+# Data handling
+USE_PROMPTS = False                      # Include prompt text in input or just the response
 
-# ====== STANDARD UPSAMPLING CONFIGURATION (Used when use_upsampling_grid = False) ======
-upsample_extreme = False                # True: Enable upsampling | False: Disable upsampling
-upsample_threshold = 0.62               # Threshold for extreme values
-upsample_factor_positive = 2.8          # Upsampling factor for positive extremes
-upsample_factor_negative = 2            # Upsampling factor for negative extremes
+# Default upsampling settings (active if not using the grid)
+upsample_extreme = False                 
+upsample_threshold = 0.62                
+upsample_factor_positive = 2.8           
+upsample_factor_negative = 2             
 
-# ====== OPTUNA CONFIGURATION (For Optuna mode) ======
-n_trials_optuna = 180                     # Number of Optuna trials per configuration
-freeze_during_search = True              # True: Freeze backbone during search | False: Train all parameters
+# Search settings
+n_trials_optuna = 180                     
+freeze_during_search = True              # Speeds up search by freezing the backbone
 
-# ====== TRAINING CONFIGURATION ======
+# Training basics
 seed = 42
 max_length = 2048
 batch_size_eval = 16
 gradient_accumulation_steps_default = 1
 early_stopping_patience = 2
 
-
-# ====== SINGLE MODEL PARAMETERS (Used when RUN_SINGLE_MODEL = True) ======
+# Params for a single run (if we aren't searching)
 SINGLE_MODEL_PARAMS = {
-    "learning_rate": 6.482131165247738e-05,
+    "learning_rate": 8.693125771439495e-05,
     "per_device_train_batch_size": 3,
     "gradient_accumulation_steps": 1,
-    "weight_decay": 0.04807901366051648,
-    "num_train_epochs": 4,
-    "adam_epsilon": 1.9030368381735818e-07,
-    "warmup_ratio": 0.14016725176148134,
+    "weight_decay": 0.12583141206455262,
+    "num_train_epochs": 5,
+    "adam_epsilon": 1.071087092582853e-08,
+    "warmup_ratio": 0.18651889995585025,
     "lr_scheduler_type": "constant"
 }
 
-# ====== GRID OF UPSAMPLING CONFIGURATIONS (Used when use_upsampling_grid = True) ======
-# Each tuple: (enabled, threshold, positive_factor, negative_factor)
+# Grid for testing different data balancing strategies
 UPSAMPLING_GRID = [
-    (False, 0.0, 1.0, 1.0),             # Config 0: No upsampling (baseline)
-    (True, 0.72, 2.8, 2.0),             # Config 1: Baseline
-    (True, 0.72, 2.8, 2.8),             # Config 2
-    (True, 0.72, 1.0, 2.0),             # Config 3
-    (True, 0.72, 1.5, 2.1),             # Config 4
-    (True, 0.72, 2.8, 3.0),             # Config 5
-    (True, 0.72, 2.5, 2.5),              # Config 6
-    (True, 0.72, 2.8, 3.4),             # Config 7
-    (True, 0.72, 2.3, 2.3),             # Config 8
-    (True, 0.72, 2.5, 1.8),             # Config 9: Different pos/neg factors
+    (False, 0.0, 1.0, 1.0),             # Baseline
+    (True, 0.72, 2.8, 2.0),             
+    (True, 0.72, 2.8, 2.8),             
+    (True, 0.72, 1.0, 2.0),             
+    (True, 0.72, 1.5, 2.1),             
+    (True, 0.72, 2.8, 3.0),             
+    (True, 0.72, 2.5, 2.5),              
+    (True, 0.72, 2.8, 3.4),             
+    (True, 0.72, 2.3, 2.3),             
+    (True, 0.72, 2.5, 1.8),             
 ]
 
-# Determine results filename based on mode
+# Set the output filename based on what we're running so we don't overwrite good results.
 if RUN_SINGLE_MODEL:
     if use_upsampling_grid:
         RESULTS_FILE = "results_file_single_model_grid.txt"
@@ -112,27 +115,19 @@ else:
     else:
         RESULTS_FILE = "results_file_standard.txt"
 
-# =================================================
-#              SETUP & REPRODUCIBILITY
-# =================================================
 
 set_seed(seed)
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
 
-# =================================================
-#                TOKENIZER & UTILS
-# =================================================
+# --- Tokenizer ---
 
-# Tokenizer must be created before processing
 tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, trust_remote_code=True)
 
 def tokenize_texts_no_padding(tokenizer, texts, text_pairs=None, max_length=max_length):
-    """
-    Tokenize once WITHOUT padding (so tokenized outputs are lists of variable-length token sequences).
-    Allows for optional text_pairs (e.g. Prompt + Response).
-    """
+    # We tokenize without padding here to save memory; the DataCollator handles padding 
+    # dynamically per batch later.
     args = {
         "text": texts,
         "truncation": True,
@@ -148,16 +143,12 @@ def tokenize_texts_no_padding(tokenizer, texts, text_pairs=None, max_length=max_
     return tokenizer(**args)
 
 
-# =================================================
-#                  DATASET CLASSES
-# =================================================
+# --- Dataset ---
 
 class EncodedRegDataset(Dataset):
-    """
-    Dataset class storing pre-tokenized inputs (unpadded) and labels.
-    """
+    # Simple wrapper to hold our lists. Converting to tensors happens at getitem 
+    # to keep memory footprint low during init.
     def __init__(self, encodings, labels, texts):
-        # Convert tokenizer BatchEncoding to plain dict-of-lists if necessary
         if hasattr(encodings, "data") and isinstance(encodings.data, dict):
             enc_dict = encodings.data
         elif isinstance(encodings, dict):
@@ -165,10 +156,8 @@ class EncodedRegDataset(Dataset):
         else:
             raise ValueError("encodings must be a dict or BatchEncoding")
             
-        # Ensure values are python lists (not tensors) to save memory before collation
         self.encodings = {k: list(v) for k, v in enc_dict.items()}
         
-        # Some tokenizers might not return token_type_ids, handle gracefully
         if "token_type_ids" not in self.encodings:
              self.encodings.pop("token_type_ids", None)
 
@@ -179,7 +168,6 @@ class EncodedRegDataset(Dataset):
         return len(self.labels)
 
     def __getitem__(self, idx):
-        # Return tokenized inputs (unpadded) as lists
         item = {
             "input_ids": self.encodings["input_ids"][idx],
             "attention_mask": self.encodings["attention_mask"][idx],
@@ -190,12 +178,8 @@ class EncodedRegDataset(Dataset):
         return item
 
 def get_dataset_labels(dataset):
-    """
-    Robustly retrieves labels from a Dataset, regardless of whether it's 
-    EncodedRegDataset or a PyTorch Subset.
-    """
+    # Helper to get labels out of a Subset or the main dataset without crashing
     if isinstance(dataset, Subset):
-        # Access the underlying dataset's labels using the subset indices
         return [dataset.dataset.labels[i] for i in dataset.indices]
     elif hasattr(dataset, "labels"):
         return dataset.labels
@@ -203,19 +187,14 @@ def get_dataset_labels(dataset):
         raise ValueError(f"Could not extract labels from dataset type: {type(dataset)}")
 
 
-# =================================================
-#              DATA LOADING & PREPARATION
-# =================================================
+# --- Data Prep & Upsampling ---
 
 def upsample_extreme_consensus(df, threshold=0.5, upsample_factor_positive=2, upsample_factor_negative=2, stage=""):
-    """
-    Upsample datapoints where chosen_consensus > threshold (positive) and < -threshold (negative) with different factors.
-    """
-    # Ensure factors are integers
+    # The dataset is imbalanced. This isolates the high/low consensus rows, copies them, 
+    # and shuffles them back in to help the model learn the tails.
     upsample_factor_positive = int(upsample_factor_positive)
     upsample_factor_negative = int(upsample_factor_negative)
     
-    # Identify extreme consensus values
     positive_extreme_mask = df["chosen_consensus"] > threshold
     negative_extreme_mask = df["chosen_consensus"] < -threshold
     
@@ -223,33 +202,25 @@ def upsample_extreme_consensus(df, threshold=0.5, upsample_factor_positive=2, up
     positive_extreme_df = df[positive_extreme_mask]
     negative_extreme_df = df[negative_extreme_mask]
     
-    # Upsample positive and negative extreme samples separately
     positive_extreme_df_upsampled = pd.concat([positive_extreme_df] * upsample_factor_positive, ignore_index=True)
     negative_extreme_df_upsampled = pd.concat([negative_extreme_df] * upsample_factor_negative, ignore_index=True)
     
-    # Combine and shuffle
     df_balanced = pd.concat([normal_df, positive_extreme_df_upsampled, negative_extreme_df_upsampled], ignore_index=True)
     df_balanced = df_balanced.sample(frac=1, random_state=seed).reset_index(drop=True)
     
-    # Better logging
     stage_label = f" [{stage}]" if stage else ""
     print(f"\n--- Upsampling Details{stage_label} ---")
-    print(f"Original dataset size: {len(df)}")
-    print(f"Normal samples (|consensus| <= {threshold}): {len(normal_df)}")
-    print(f"Positive extreme samples (consensus > {threshold}): {len(positive_extreme_df)} -> upsampled {upsample_factor_positive}x -> {len(positive_extreme_df_upsampled)}")
-    print(f"Negative extreme samples (consensus < {-threshold}): {len(negative_extreme_df)} -> upsampled {upsample_factor_negative}x -> {len(negative_extreme_df_upsampled)}")
-    print(f"Final dataset size: {len(df_balanced)}")
-    print(f"Increase: {len(df_balanced) - len(df)} samples ({100*(len(df_balanced)-len(df))/len(df):.1f}%)\n")
+    print(f"Original: {len(df)} -> Final: {len(df_balanced)}")
+    print(f"Added: {len(df_balanced) - len(df)} samples\n")
     
     return df_balanced
 
 
 def prepare_datasets(full_train_df, upsample_enabled, upsample_threshold, upsample_factor_positive, upsample_factor_negative):
-    """
-    Prepare search and final training datasets with given upsampling configuration.
-    Uses USE_PROMPTS to decide whether to include prompt_body.
-    """
-    # 2. PREPARE DATA FOR SEARCH (Split Training Data Internal ONLY)
+    # Splits data for search vs final training. 
+    # Crucially, we only upsample the TRAINING portion. Validation must remain real distribution.
+    
+    # 1. Search Data Prep
     if use_kfold:
         search_train_df = full_train_df
         search_val_dataset = None
@@ -260,13 +231,11 @@ def prepare_datasets(full_train_df, upsample_enabled, upsample_threshold, upsamp
             random_state=seed,
         )
         
-        # Upsample ONLY the sub-train portion
         if upsample_enabled:
             sub_train_df = upsample_extreme_consensus(sub_train_df, threshold=upsample_threshold, upsample_factor_positive=upsample_factor_positive, upsample_factor_negative=upsample_factor_negative, stage="search training")
         
         search_train_df = sub_train_df
         
-        # Prepare the sub-validation dataset used ONLY for Optuna (NOT upsampled)
         sub_val_texts = sub_val_df["model_response_text"].astype(str).tolist()
         sub_val_labels = sub_val_df["chosen_consensus"].astype(float).clip(-1, 1).tolist()
         
@@ -278,7 +247,7 @@ def prepare_datasets(full_train_df, upsample_enabled, upsample_threshold, upsamp
             
         search_val_dataset = EncodedRegDataset(sub_val_encodings, sub_val_labels, sub_val_texts)
 
-    # Prepare the training dataset for search
+    # Tokenize search training data
     search_train_texts = search_train_df["model_response_text"].astype(str).tolist()
     search_train_labels = search_train_df["chosen_consensus"].astype(float).clip(-1, 1).tolist()
     
@@ -290,7 +259,7 @@ def prepare_datasets(full_train_df, upsample_enabled, upsample_threshold, upsamp
         
     search_train_dataset = EncodedRegDataset(search_train_encodings, search_train_labels, search_train_texts)
 
-    # 3. PREPARE FINAL TRAINING DATA (Use 100% of Training CSV, upsampled)
+    # 2. Final Training Data Prep (Uses 100% of data)
     full_train_df_for_final = full_train_df.copy()
     if upsample_enabled:
         full_train_df_for_final = upsample_extreme_consensus(full_train_df_for_final, threshold=upsample_threshold, upsample_factor_positive=upsample_factor_positive, upsample_factor_negative=upsample_factor_negative, stage="final training")
@@ -309,10 +278,10 @@ def prepare_datasets(full_train_df, upsample_enabled, upsample_threshold, upsamp
     return search_train_dataset, search_val_dataset, full_train_dataset
 
 
-# 1. Load Full Training Data (from CSV) - ONCE at the beginning
+# Load raw data once
 full_train_df = pd.read_csv(TRAIN_CSV_PATH).dropna(subset=["model_response_text", "chosen_consensus"]).reset_index(drop=True)
 
-# 4. PREPARE FINAL TEST/VALIDATION DATA (Real Held-out Validation) - ONCE at the beginning
+# Prepare the held-out validation set once
 final_test_df = pd.read_csv(VAL_CSV_PATH).dropna(subset=["model_response_text", "chosen_consensus"]).reset_index(drop=True)
 final_test_texts = final_test_df["model_response_text"].astype(str).tolist()
 final_test_labels = final_test_df["chosen_consensus"].astype(float).clip(-1, 1).tolist()
@@ -325,34 +294,26 @@ else:
     
 final_test_dataset = EncodedRegDataset(final_test_encodings, final_test_labels, final_test_texts)
 
-# Data Collator
 data_collator = DataCollatorWithPadding(tokenizer=tokenizer, padding=True, return_tensors="pt")
 
 
-# =================================================
-#                MODEL INITIALIZATION
-# =================================================
+# --- Model Setup ---
 
 class MSETrainer(Trainer):
+    # Override loss for regression (MSE) instead of default CrossEntropy
     def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
-        # Extract labels
         labels = inputs.get("labels")
-        
-        # Forward pass
         outputs = model(**inputs)
         logits = outputs.get("logits")
         
-        # Compute custom loss (MAE / L1Loss)
         loss_fct = torch.nn.MSELoss()
         loss = loss_fct(logits.squeeze(), labels.squeeze())
         
         return (loss, outputs) if return_outputs else loss
 
 def get_model_init(freeze_backbone=False):
-    """
-    Returns a model_init function with the specific freeze configuration baked in.
-    This avoids using global variables for configuration.
-    """
+    # Using a closure to bake in the freeze logic. This allows Optuna to re-init 
+    # the model cleanly for every trial without global state issues.
     def _model_init():
         model = AutoModelForSequenceClassification.from_pretrained(
             MODEL_PATH,
@@ -361,7 +322,7 @@ def get_model_init(freeze_backbone=False):
             trust_remote_code=True,
         )
 
-        # Attempt to enable Flash Attention optimizations
+        # Optimization flags (Flash Attention / Grad Checkpointing)
         try:
             model.config.use_flash_attention = True
         except Exception:
@@ -372,13 +333,12 @@ def get_model_init(freeze_backbone=False):
         except Exception:
             pass
 
-        # Enable gradient checkpointing for long sequences
         if max_length > 1024 and not freeze_backbone:
             model.gradient_checkpointing_enable()
             if hasattr(model, "enable_input_require_grads"):
                 model.enable_input_require_grads()
 
-        # Freeze backbone if requested
+        # Freezing logic for faster hyperparam search
         if freeze_backbone:
             backbone = None
             if hasattr(model, "base_model"):
@@ -390,7 +350,6 @@ def get_model_init(freeze_backbone=False):
                 for param in backbone.parameters():
                     param.requires_grad = False
             else:
-                # Fallback: freeze all parameters except specific heads
                 for name, p in model.named_parameters():
                     if any(k in name for k in ["classifier", "regressor", "score", "out_proj", "lm_head"]):
                         p.requires_grad = True
@@ -401,9 +360,7 @@ def get_model_init(freeze_backbone=False):
     return _model_init
 
 
-# =================================================
-#                METRICS & UTILITIES
-# =================================================
+# --- Metrics & Eval ---
 
 def compute_metrics(eval_pred):
     preds, labels = eval_pred
@@ -420,9 +377,7 @@ def compute_metrics(eval_pred):
 
 
 def train_evaluate_fold(train_subset, val_subset, params, freeze_backbone_flag=False, early_stop=False):
-    """
-    Trains a Trainer on the provided subsets and returns the validation MSE.
-    """
+    # Helper to run a training loop on a specific fold/split
     training_args = TrainingArguments(
         output_dir=OUTPUT_DIR,
         do_train=True,
@@ -449,7 +404,6 @@ def train_evaluate_fold(train_subset, val_subset, params, freeze_backbone_flag=F
     if early_stop:
         callbacks.append(EarlyStoppingCallback(early_stopping_patience=early_stopping_patience))
 
-    # Pass the specific model init for this run
     trainer = MSETrainer(
         model_init=get_model_init(freeze_backbone=freeze_backbone_flag),
         args=training_args,
@@ -461,18 +415,16 @@ def train_evaluate_fold(train_subset, val_subset, params, freeze_backbone_flag=F
         callbacks=callbacks if callbacks else None,
     )
 
-    # Train and Evaluate
     trainer.train()
     metrics = trainer.evaluate()
     
     return metrics["eval_mse"], metrics
 
 
-# =================================================
-#              OPTUNA SEARCH FUNCTIONS
-# =================================================
+# --- Optuna ---
 
 def optuna_hp_space(trial):
+    # The search space for hyperparams
     return {
         "learning_rate": trial.suggest_float("learning_rate", 5e-5, 1e-4, log=True),  
         "per_device_train_batch_size": trial.suggest_categorical("per_device_train_batch_size", [3, 4, 6]),  
@@ -503,7 +455,7 @@ def run_optuna_kfold_search(train_dataset, train_df, n_trials=20,
             fold_train_df = train_df.iloc[train_idx].reset_index(drop=True)
             fold_val_df = train_df.iloc[val_idx].reset_index(drop=True)
             
-            # --- UPSAMPLING FOR FOLD TRAINING DATA ---
+            # Upsample ONLY the fold's training data
             if upsample_enabled:
                 fold_train_df = upsample_extreme_consensus(
                     fold_train_df, 
@@ -513,7 +465,7 @@ def run_optuna_kfold_search(train_dataset, train_df, n_trials=20,
                     stage="k-fold training"
                 )
             
-            # Prepare fold training dataset
+            # Convert fold data to datasets
             fold_train_texts = fold_train_df["model_response_text"].astype(str).tolist()
             fold_train_labels = fold_train_df["chosen_consensus"].astype(float).clip(-1, 1).tolist()
             
@@ -525,7 +477,6 @@ def run_optuna_kfold_search(train_dataset, train_df, n_trials=20,
                 
             fold_train_subset = EncodedRegDataset(fold_train_encodings, fold_train_labels, fold_train_texts)
             
-            # Prepare fold validation dataset
             fold_val_texts = fold_val_df["model_response_text"].astype(str).tolist()
             fold_val_labels = fold_val_df["chosen_consensus"].astype(float).clip(-1, 1).tolist()
             
@@ -545,6 +496,7 @@ def run_optuna_kfold_search(train_dataset, train_df, n_trials=20,
             )
             fold_mses.append(mse)
             
+            # Pruning based on average MSE so far
             intermediate = np.mean(fold_mses)
             trial.report(intermediate, len(fold_mses))
             
@@ -623,9 +575,7 @@ def run_optuna_simple_search(search_train_dataset, search_val_dataset, n_trials=
     return trial.params
 
 
-# =================================================
-#              FINAL TRAINING & EVALUATION
-# =================================================
+# --- Final Model Train ---
 
 def train_final_model(best_params, full_train_dataset):
     
@@ -679,14 +629,10 @@ def train_final_model(best_params, full_train_dataset):
 
 
 def plot_input_distributions(train_labels, val_labels, output_dir):
-    """
-    Generates and saves histograms for Training and Validation data distributions.
-    Added as per user request: Sycophancy (x) vs Amount (y).
-    """
+    # Dumps distributions so we can see if training data matches validation data shape.
     sns.set(style="whitegrid")
     os.makedirs(output_dir, exist_ok=True)
 
-    # 1. Plot Training Data Distribution
     plt.figure(figsize=(8, 6))
     sns.histplot(train_labels, color='green', label='Training Data', kde=False)
     plt.title("Distribution of Training Data", fontsize=14)
@@ -697,7 +643,6 @@ def plot_input_distributions(train_labels, val_labels, output_dir):
     plt.savefig(os.path.join(output_dir, "plot_distribution_training_data.png"), dpi=300)
     plt.close()
 
-    # 2. Plot Validation Data Distribution
     plt.figure(figsize=(8, 6))
     sns.histplot(val_labels, color='red', label='Validation Data', kde=False)
     plt.title("Distribution of Validation Data", fontsize=14)
@@ -711,18 +656,12 @@ def plot_input_distributions(train_labels, val_labels, output_dir):
     print(f"Distribution plots saved to {output_dir}")
 
 
-
 def create_plots(true_labels, preds, output_dir):
-    """
-    Generates and saves 3 key regression plots:
-    1. Scatterplot (Actual vs Predicted) with best-fit line
-    2. Residuals Plot (Predicted vs Residuals)
-    3. Distribution Plot (Histogram of Actual vs Predicted)
-    """
+    # Generates standard regression analysis plots (Actual vs Predicted, Residuals, Density)
     sns.set(style="whitegrid")
     os.makedirs(output_dir, exist_ok=True)
 
-    # 1. Scatter Plot: Actual vs Predicted with Best-Fit Line
+    # 1. Scatter
     plt.figure(figsize=(8, 6))
     plt.scatter(true_labels, preds, alpha=0.5, color='blue', edgecolors='k', s=40, label='Predictions')
     
@@ -743,7 +682,7 @@ def create_plots(true_labels, preds, output_dir):
     plt.savefig(os.path.join(output_dir, "plot_scatter_actual_vs_pred.png"), dpi=300)
     plt.close()
 
-    # 2. Residual Plot
+    # 2. Residuals
     residuals = true_labels - preds
     plt.figure(figsize=(8, 6))
     plt.scatter(preds, residuals, alpha=0.5, color='purple', edgecolors='k', s=40)
@@ -756,7 +695,7 @@ def create_plots(true_labels, preds, output_dir):
     plt.savefig(os.path.join(output_dir, "plot_residuals.png"), dpi=300)
     plt.close()
 
-    # 3. Distribution Plot (Histogram)
+    # 3. Density
     plt.figure(figsize=(8, 6))
     sns.histplot(true_labels, color="blue", label="Actual", kde=True, stat="density", alpha=0.4)
     sns.histplot(preds, color="orange", label="Predicted", kde=True, stat="density", alpha=0.4)
@@ -772,20 +711,104 @@ def create_plots(true_labels, preds, output_dir):
     print(f"Graphs saved to {output_dir}")
 
 
-# --- CHANGED: Added total_time_str argument ---
+def compute_per_model_r2_from_val_csv(df_val: pd.DataFrame, preds: np.ndarray, results_dir: str):
+    # Calculates R2 specifically for each LLM model found in the validation data.
+    df_val = df_val.copy()
+
+    n = min(len(df_val), len(preds))
+    df_val = df_val.iloc[:n]
+    preds = preds[:n]
+
+    df_val["chosen_consensus"] = df_val["chosen_consensus"].astype(float)
+    preds = np.asarray(preds, dtype=float)
+
+    if "model" not in df_val.columns:
+        print("Warning: 'model' column not found in validation dataframe. Skipping per-model R2.")
+        return
+
+    r2_by_model = {}
+    for m, g in df_val.groupby("model"):
+        y_true = g["chosen_consensus"].values
+        y_pred = preds[g.index.values]
+
+        if len(y_true) < 2:
+            r2_by_model[m] = np.nan
+            continue
+
+        if np.isclose(np.var(y_true), 0.0):
+            r2_by_model[m] = np.nan
+            continue
+
+        r2_by_model[m] = r2_score(y_true, y_pred)
+
+    r2_by_model = pd.Series(r2_by_model).sort_values(ascending=False)
+
+    os.makedirs(results_dir, exist_ok=True)
+    out_csv = os.path.join(results_dir, "per_model_r2.csv")
+    r2_by_model.to_csv(out_csv, header=["r2"])
+    print(f"Saved per-model R2 CSV to: {out_csv}")
+
+    plt.figure(figsize=(10, 5))
+    r2_by_model.plot(kind="bar")
+    plt.ylabel("R²")
+    plt.xlabel("LLM model")
+    plt.title("Per-model R² on held-out set")
+    plt.tight_layout()
+    out_png = os.path.join(results_dir, "per_model_r2.png")
+    plt.savefig(out_png, dpi=300)
+    plt.close()
+    print(f"Saved per-model R2 plot to: {out_png}")
+
+
+def compute_per_model_mse_from_val_csv(df_val: pd.DataFrame, preds: np.ndarray, results_dir: str):
+    # Calculates MSE specifically for each LLM model found in the validation data.
+    df_val = df_val.copy()
+
+    n = min(len(df_val), len(preds))
+    df_val = df_val.iloc[:n]
+    preds = preds[:n]
+
+    df_val["chosen_consensus"] = df_val["chosen_consensus"].astype(float)
+    preds = np.asarray(preds, dtype=float)
+
+    if "model" not in df_val.columns:
+        print("Warning: 'model' column not found in validation dataframe. Skipping per-model MSE.")
+        return
+
+    mse_by_model = {}
+    for m, g in df_val.groupby("model"):
+        y_true = g["chosen_consensus"].values
+        y_pred = preds[g.index.values]
+
+        mse_by_model[m] = mean_squared_error(y_true, y_pred)
+
+    # Sort so best (lowest MSE) is first
+    mse_by_model = pd.Series(mse_by_model).sort_values(ascending=True)
+
+    os.makedirs(results_dir, exist_ok=True)
+    out_csv = os.path.join(results_dir, "per_model_mse.csv")
+    mse_by_model.to_csv(out_csv, header=["mse"])
+    print(f"Saved per-model MSE CSV to: {out_csv}")
+
+    plt.figure(figsize=(10, 5))
+    mse_by_model.plot(kind="bar", color='salmon')
+    plt.ylabel("MSE")
+    plt.xlabel("LLM model")
+    plt.title("Per-model MSE on held-out set")
+    plt.tight_layout()
+    out_png = os.path.join(results_dir, "per_model_mse.png")
+    plt.savefig(out_png, dpi=300)
+    plt.close()
+    print(f"Saved per-model MSE plot to: {out_png}")
+
+
 def evaluate_and_save_results(model, tokenizer, dataset, results_file, best_params, upsample_enabled, upsample_threshold, upsample_factor_positive, upsample_factor_negative, config_idx=None, batch_size=batch_size_eval, is_single_model=False, total_time_str=None):
-    """
-    Evaluate the final model, print metrics, generate plots, and PREPEND results to a file.
-    Also saves a specific results file inside the model directory.
-    """
+    # Runs the final eval, generates all plots, and appends the metrics to our results file.
     model.to(device)
     model.eval()
     
     total = len(dataset)
-    
-    # Use robust label extraction
     true_labels = np.array(get_dataset_labels(dataset))
-    
     preds_list = []
 
     print("Running final evaluation...")
@@ -802,20 +825,20 @@ def evaluate_and_save_results(model, tokenizer, dataset, results_file, best_para
 
     preds = np.concatenate(preds_list, axis=0)
 
-    # Metrics Calculation
+    # Compute and plot breakdown by model
+    compute_per_model_r2_from_val_csv(final_test_df, preds, OUTPUT_DIR)
+    compute_per_model_mse_from_val_csv(final_test_df, preds, OUTPUT_DIR)
+    
     mse = mean_squared_error(true_labels, preds)
     mae = mean_absolute_error(true_labels, preds)
     r2 = r2_score(true_labels, preds)
 
-    # Generate plots
     create_plots(true_labels, preds, OUTPUT_DIR)
     plot_input_distributions(full_train_dataset.labels, final_test_dataset.labels, OUTPUT_DIR)
 
-    # --- Formatting for File ---
+    # Logging text
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
     params_str = ", ".join([f"{k}={v}" for k, v in best_params.items()])
-    
     separator = "-" * 50
     
     new_entry = (
@@ -833,7 +856,6 @@ def evaluate_and_save_results(model, tokenizer, dataset, results_file, best_para
         f"Validation R^2: {r2:.4f}\n"
     )
     
-    # --- CHANGED: Add execution time logging if provided ---
     if total_time_str:
         new_entry += f"Total Script Execution Time: {total_time_str}\n"
 
@@ -854,7 +876,7 @@ def evaluate_and_save_results(model, tokenizer, dataset, results_file, best_para
 
     print(new_entry)
     
-    # --- Prepend to Shared Results File ---
+    # Prepend to log file so newest results are at the top
     if os.path.exists(results_file):
         with open(results_file, "r") as f:
             existing_content = f.read()
@@ -866,23 +888,17 @@ def evaluate_and_save_results(model, tokenizer, dataset, results_file, best_para
         
     print(f"Results prepended to {results_file}")
 
-    # --- ADDED: Save copy to Model Output Directory ---
+    # Also save a run-specific log in the output dir
     model_results_path = os.path.join(OUTPUT_DIR, "run_metrics.txt")
     with open(model_results_path, "w") as f:
         f.write(new_entry)
     print(f"Results also saved to: {model_results_path}")
 
 
-# =================================================
-#          SINGLE MODEL EXECUTION
-# =================================================
+# --- Single Model Execution ---
 
 def train_single_model(params, full_train_dataset):
-    """
-    Train a single model with given parameters and evaluate on test set.
-    Does NOT run Optuna search.
-    """
-    
+    # Standard training loop without any Optuna overhead
     use_bf16 = use_cuda and torch.cuda.is_bf16_supported()
 
     training_args = TrainingArguments(
@@ -931,18 +947,15 @@ def train_single_model(params, full_train_dataset):
     return trainer
 
 
-# =================================================
-#                  MAIN EXECUTION
-# =================================================
+# --- Main ---
 
 if __name__ == "__main__":
-    # --- CHANGED: Start Timer ---
     script_start_time = time.time()
     
     if RUN_SINGLE_MODEL:
-        # ===== SINGLE MODEL MODE =====
+        # 1. Single Model Mode
         if use_upsampling_grid:
-            # Single model with upsampling grid
+            # Grid of upsampling settings with a fixed model config
             print(f"\n{'='*60}")
             print(f"SINGLE MODEL EXECUTION WITH UPSAMPLING GRID")
             print(f"Total configurations: {len(UPSAMPLING_GRID)}")
@@ -958,7 +971,6 @@ if __name__ == "__main__":
                     print(f"  Negative Factor: {upsample_factor_negative}")
                 print(f"{'='*60}\n")
                 
-                # Prepare datasets with current upsampling configuration
                 search_train_dataset, search_val_dataset, full_train_dataset = prepare_datasets(
                     full_train_df,
                     upsample_enabled,
@@ -967,18 +979,15 @@ if __name__ == "__main__":
                     upsample_factor_negative
                 )
                 
-                # Train single model
                 print("Parameters:")
                 for k, v in SINGLE_MODEL_PARAMS.items():
                     print(f"  {k}: {v}\n")
                 
                 trainer = train_single_model(SINGLE_MODEL_PARAMS, full_train_dataset)
                 
-                # --- CHANGED: Calculate Time ---
                 elapsed_seconds = time.time() - script_start_time
                 execution_time_str = str(datetime.timedelta(seconds=int(elapsed_seconds)))
 
-                # Evaluate and save results
                 evaluate_and_save_results(
                     trainer.model,
                     tokenizer,
@@ -1003,7 +1012,7 @@ if __name__ == "__main__":
             print(f"{'='*60}\n")
         
         else:
-            # Single model with standard upsampling
+            # Standard single run
             print(f"\n{'='*60}")
             print(f"SINGLE MODEL EXECUTION WITH STANDARD UPSAMPLING")
             print(f"{'='*60}\n")
@@ -1014,7 +1023,6 @@ if __name__ == "__main__":
                 print(f"  Negative Factor: {upsample_factor_negative}")
             print(f"{'='*60}\n")
             
-            # Prepare datasets with standard upsampling configuration
             search_train_dataset, search_val_dataset, full_train_dataset = prepare_datasets(
                 full_train_df,
                 upsample_extreme,
@@ -1023,18 +1031,15 @@ if __name__ == "__main__":
                 upsample_factor_negative
             )
             
-            # Train single model
             print("Parameters:")
             for k, v in SINGLE_MODEL_PARAMS.items():
                 print(f"  {k}: {v}\n")
             
             trainer = train_single_model(SINGLE_MODEL_PARAMS, full_train_dataset)
             
-            # --- CHANGED: Calculate Time ---
             elapsed_seconds = time.time() - script_start_time
             execution_time_str = str(datetime.timedelta(seconds=int(elapsed_seconds)))
 
-            # Evaluate and save results
             evaluate_and_save_results(
                 trainer.model,
                 tokenizer,
@@ -1057,7 +1062,7 @@ if __name__ == "__main__":
             print(f"{'='*60}\n")
     
     elif use_upsampling_grid:
-        # Optuna search with upsampling grid
+        # 2. Optuna + Grid Search
         print(f"\n{'='*60}")
         print(f"RUNNING UPSAMPLING GRID SEARCH WITH OPTUNA")
         print(f"Total configurations: {len(UPSAMPLING_GRID)}")
@@ -1074,7 +1079,6 @@ if __name__ == "__main__":
                 print(f"  Negative Factor: {upsample_factor_negative}")
             print(f"{'='*60}\n")
             
-            # Prepare datasets with current upsampling configuration
             search_train_dataset, search_val_dataset, full_train_dataset = prepare_datasets(
                 full_train_df,
                 upsample_enabled,
@@ -1083,7 +1087,6 @@ if __name__ == "__main__":
                 upsample_factor_negative
             )
             
-            # Run Optuna search
             if use_kfold:
                 best_params = run_optuna_kfold_search(
                     search_train_dataset, 
@@ -1100,10 +1103,8 @@ if __name__ == "__main__":
             print("\n=== Best params chosen ===")
             print(best_params)
 
-            # Final Training and Evaluation
             final_trainer = train_final_model(best_params, full_train_dataset)
 
-            # --- CHANGED: Calculate Time ---
             elapsed_seconds = time.time() - script_start_time
             execution_time_str = str(datetime.timedelta(seconds=int(elapsed_seconds)))
 
@@ -1131,7 +1132,7 @@ if __name__ == "__main__":
         print(f"{'='*60}\n")
     
     else:
-        # Standard Optuna search with single upsampling config
+        # 3. Standard Optuna Search
         print(f"\n{'='*60}")
         print(f"RUNNING STANDARD UPSAMPLING WITH OPTUNA")
         print(f"Upsampling Enabled: {upsample_extreme}")
@@ -1141,7 +1142,6 @@ if __name__ == "__main__":
             print(f"  Negative Factor: {upsample_factor_negative}")
         print(f"{'='*60}\n")
         
-        # Prepare datasets with standard upsampling configuration
         search_train_dataset, search_val_dataset, full_train_dataset = prepare_datasets(
             full_train_df,
             upsample_extreme,
@@ -1150,7 +1150,6 @@ if __name__ == "__main__":
             upsample_factor_negative
         )
         
-        # Run Optuna search
         if use_kfold:
             best_params = run_optuna_kfold_search(
                 search_train_dataset, 
@@ -1167,10 +1166,8 @@ if __name__ == "__main__":
         print("\n=== Best params chosen ===")
         print(best_params)
 
-        # Final Training and Evaluation
         final_trainer = train_final_model(best_params, full_train_dataset)
 
-        # --- Calculate Time ---
         elapsed_seconds = time.time() - script_start_time
         execution_time_str = str(datetime.timedelta(seconds=int(elapsed_seconds)))
 
