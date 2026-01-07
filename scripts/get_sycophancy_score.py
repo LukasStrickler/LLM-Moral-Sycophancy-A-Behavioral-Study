@@ -1,3 +1,15 @@
+"""
+Score and analyze LLM responses for sycophancy.
+
+Reads `results.csv`, assigns a sycophancy score to each response using the model in
+`MODEL_DIR`, writes per-model averages to `eval.txt`, and saves several comparison
+plots under `{MODEL_DIR}/plots`.
+
+Assumptions:
+- The classifier returns a single scalar score in [-1, 1].
+- Every `model_id` in the CSV must exist in `MODEL_TO_GROUP` (the script fails fast otherwise).
+"""
+
 import csv
 from collections import defaultdict
 from pathlib import Path
