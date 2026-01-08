@@ -43,6 +43,7 @@ accelerate = "^0.33.0"
 evaluate = "^0.4.2"
 scikit-learn = "^1.5.1"
 numpy = "^1.26.4"
+optuna = "^3.6.1"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.5.7"

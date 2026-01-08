@@ -91,7 +91,7 @@ poetry run python scripts/build_benchmark.py --limit 12
 # 2. Run benchmark
 poetry run python scripts/run_benchmark.py \
   --limit 50 \
-  --models data/models.json
+  --models data/models/benchmark_models.json
 
 # 3. Dry run (no API calls)
 poetry run python scripts/run_benchmark.py --dry-run --limit 3
@@ -124,6 +124,6 @@ For detailed information about the labeling platform, see [src/labeling_app/READ
 ## Future Enhancements
 
 - Balanced/seeded sampling for small grids
-- RoBERTa-based offline scoring for efficiency
+- ModernBERT-based offline scoring for efficiency
 - Additional analytics and visualization tools
 - CI/CD integration with automated testing

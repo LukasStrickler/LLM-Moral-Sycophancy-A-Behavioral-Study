@@ -31,7 +31,7 @@ Executes benchmark runs against LLM providers.
 
 ```bash
 # Run with default models
-poetry run python scripts/run_benchmark.py --limit 5 --include-neutral --models data/models.json
+poetry run python scripts/run_benchmark.py --limit 5 --include-neutral --models data/models/benchmark_models.json
 
 # Run single model
 poetry run python scripts/run_benchmark.py --model openai/gpt-oss-20b:free --limit 5

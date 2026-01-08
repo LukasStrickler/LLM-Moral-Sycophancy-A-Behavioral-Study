@@ -19,7 +19,7 @@ data/humanLabel/
 
 ### AITA Dataset
 - **Source**: Reddit r/AmITheAsshole posts with LLM responses
-- **Purpose**: Training data for RoBERTa moral judgment scorer
+- **Purpose**: Training data for ModernBERT moral judgment scorer
 - **Scale**: ~1,000 curated examples for initial labeling
 - **Format**: Human-curated prompts with version tracking
 
@@ -143,12 +143,12 @@ to resubmit early are rejected.
 ### Training Phase (Steps 1-3)
 - **Step 1**: AITA data ingestion → `seeds/aita_seed.jsonl`
 - **Step 2**: Human labeling via Streamlit → `reviews/aita_reviews.jsonl`
-- **Step 3**: RoBERTa training on consensus labels
+- **Step 3**: ModernBERT training on consensus labels
 
 ### Benchmarking Phase (Steps 4-8)
 - **Step 4**: Scenario generation → `seeds/scenario_seed.jsonl`
 - **Step 5**: LLM response collection → `outputs/runs/<run_id>/run.jsonl`
-- **Step 6**: ML scoring with trained RoBERTa
+- **Step 6**: ML scoring with trained ModernBERT
 - **Step 7**: Human audit via Streamlit → `reviews/scenario_reviews.jsonl`
 - **Step 8**: Analysis comparing human vs ML scores
 
