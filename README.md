@@ -102,7 +102,7 @@ Quick access to all project documentation:
 
 ### Quick Links
 - **[Environment Setup](.env.example)** - Configuration template
-- **[Model Configuration](data/models.json)** - LLM model settings
+- **[Model Configuration](data/models/benchmark_models.json)** - LLM model settings
 - **[Project License](LICENSE)** - MIT License details
 
 ## 📈 Pipeline Overview
@@ -182,8 +182,8 @@ poetry run python scripts/build_benchmark.py --include-neutral --limit 10
 
 #### 2. Run Benchmark
 ```bash
-# Run with default models (from data/models.json)
-poetry run python scripts/run_benchmark.py --limit 5 --include-neutral --models data/models.json
+# Run with default models
+poetry run python scripts/run_benchmark.py --limit 5 --include-neutral --models data/models/benchmark_models.json
 
 # Run a single model
 poetry run python scripts/run_benchmark.py --model google/gemini-2.0-flash-exp --limit 5
@@ -205,7 +205,7 @@ poetry run python scripts/eval_benchmark.py --input outputs/runs/<run_id>/run.js
 
 ### Model Configuration
 
-Edit `data/models.json` to configure which models to benchmark:
+Edit `data/models/benchmark_models.json` to configure which models to benchmark:
 
 ```json
 [
