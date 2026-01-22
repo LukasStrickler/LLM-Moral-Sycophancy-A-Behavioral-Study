@@ -6,6 +6,8 @@ A comprehensive research project investigating Large Language Model (LLM) moral 
 
 **Course**: IS 617 (Large Language Models for the Economic and Social Sciences) - University of Mannheim
 
+For the full methodology and results, see: [paper.pdf](paper.pdf)
+
 ## 📁 Project Structure
 
 ```
